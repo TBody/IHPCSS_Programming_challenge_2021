@@ -109,8 +109,9 @@ PROGRAM main
                     MPI_DOUBLE_PRECISION, &
                     i, &
                     tag, &
+                    MPI_COMM_WORLD, &
                     send_request(i), &
-                    MPI_COMM_WORLD, ierr)
+                    ierr)
             ENDDO
 
             ! Copy master values straight into the array in which we read the file into.
