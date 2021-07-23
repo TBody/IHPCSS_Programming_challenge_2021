@@ -93,31 +93,46 @@ PROGRAM main
     ! ////////////////////////////////////////////////////////
     start_time = MPI_Wtime()
 
-    call MPI_scatter(all_temperatures, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS * comm_size, MPI_DOUBLE_PRECISION, &
-                     temperatures_last, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
-                     MASTER_PROCESS_RANK, MPI_COMM_WORLD, ierr)
+    block
+        integer, dimension(comm_size) :: send_request
+        integer :: recv_request, tag
 
-    ! IF (my_rank .EQ. MASTER_PROCESS_RANK) THEN
-    !     DO i = 0, comm_size-1
-    !         ! Is the i'th chunk meant for me, the master MPI process?
-    !         IF (i .NE. my_rank) THEN
-    !             ! No, so send the corresponding chunk to that MPI process.
-    !             CALL MPI_Ssend(all_temperatures(0,i * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
-    !                            MPI_DOUBLE_PRECISION, i, 0, MPI_COMM_WORLD, ierr)
-    !         ELSE
-    !             ! Yes, let's copy it straight for the array in which we read the file into.
-    !             DO k = 1, COLUMNS_PER_MPI_PROCESS
-    !                 DO j = 0, ROWS_PER_MPI_PROCESS - 1
-    !                     temperatures_last(j,k) = all_temperatures(j,k-1)
-    !                 ENDDO
-    !             ENDDO
-    !         END IF
-    !     ENDDO
-    ! ELSE
-    !     ! Receive my chunk.
-    !     CALL MPI_Recv(temperatures_last(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
-    !                   MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-    ! END IF
+        IF (my_rank .EQ. MASTER_PROCESS_RANK) THEN
+            DO i = 1, comm_size-1
+                ! Know that master is always 0. So let's send all the data to other procs, and then finally work on
+                ! master data
+
+                ! Send the corresponding chunk to each MPI process.
+                call MPI_Isend(&
+                    all_temperatures(0, i * COLUMNS_PER_MPI_PROCESS), &
+                    ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
+                    MPI_DOUBLE_PRECISION, &
+                    i, &
+                    tag, &
+                    send_request(i), &
+                    MPI_COMM_WORLD, ierr)
+            ENDDO
+
+            ! Copy master values straight into the array in which we read the file into.
+            DO k = 1, COLUMNS_PER_MPI_PROCESS
+                DO j = 0, ROWS_PER_MPI_PROCESS - 1
+                    temperatures_last(j,k) = all_temperatures(j,k-1)
+                ENDDO
+            ENDDO
+            
+        ELSE
+            
+            ! Receive my chunk.
+            CALL MPI_Recv(&
+                temperatures_last(0,1), &
+                ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
+                MPI_DOUBLE_PRECISION, &
+                MASTER_PROCESS_RANK, &
+                MPI_ANY_TAG, &
+                MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+            
+        END IF
+    end block
 
     ! Copy the temperatures into the current iteration temperature as well
     DO j = 1, COLUMNS_PER_MPI_PROCESS
