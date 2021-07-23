@@ -168,59 +168,74 @@ PROGRAM main
         ! -- SUBTASK 1: EXCHANGE GHOST CELLS -- //
         ! ////////////////////////////////////////
 
+        ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
+        CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, 0, MPI_COMM_WORLD, ierr)
+
+        ! Receive data from down neighbour to fill our ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
+        CALL MPI_Recv(temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
+                      MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
+        ! Send data to down neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
+        CALL MPI_Ssend(temperatures(0, COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, 0,&
+                       MPI_COMM_WORLD, ierr)
+
+        ! Receive data from up neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
+        CALL MPI_Recv(temperatures_last(0,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, MPI_ANY_TAG, MPI_COMM_WORLD, &
+                      MPI_STATUS_IGNORE, ierr)
+
         ! Send data to left neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI send will do nothing.
-        left_send_buffer = temperatures(0,1)
-        right_send_buffer = temperatures(0, COLUMNS_PER_MPI_PROCESS)
+        ! left_send_buffer = temperatures(0,1)
+        ! right_send_buffer = temperatures(0, COLUMNS_PER_MPI_PROCESS)
 
-        call MPI_Isend(&
-                left_send_buffer, &
-                ROWS_PER_MPI_PROCESS, &
-                MPI_DOUBLE_PRECISION, &
-                left_neighbour_rank, &
-                left_send_tag, &
-                MPI_COMM_WORLD, &
-                left_send_request, &
-                ierr)
+        ! call MPI_Isend(&
+        !         left_send_buffer, &
+        !         ROWS_PER_MPI_PROCESS, &
+        !         MPI_DOUBLE_PRECISION, &
+        !         left_neighbour_rank, &
+        !         left_send_tag, &
+        !         MPI_COMM_WORLD, &
+        !         left_send_request, &
+        !         ierr)
         
-        ! Send data to right neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        call MPI_Isend(&
-                right_send_buffer, &
-                ROWS_PER_MPI_PROCESS, &
-                MPI_DOUBLE_PRECISION, &
-                right_neighbour_rank, &
-                right_send_tag, &
-                MPI_COMM_WORLD, &
-                right_send_request, &
-                ierr)
+        ! ! Send data to right neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
+        ! call MPI_Isend(&
+        !         right_send_buffer, &
+        !         ROWS_PER_MPI_PROCESS, &
+        !         MPI_DOUBLE_PRECISION, &
+        !         right_neighbour_rank, &
+        !         right_send_tag, &
+        !         MPI_COMM_WORLD, &
+        !         right_send_request, &
+        !         ierr)
 
-        ! Receive data from right neighbour to fill our ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
-        CALL MPI_Recv(right_recv_buffer, &
-                      ROWS_PER_MPI_PROCESS, &
-                      MPI_DOUBLE_PRECISION, &
-                      right_neighbour_rank, &
-                      left_send_tag, &
-                      MPI_COMM_WORLD, &
-                      MPI_STATUS_IGNORE, &
-                      ierr)
-        if (right_neighbour_rank == MPI_PROC_NULL) then
-            right_recv_buffer = temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1)
-        endif
+        ! ! Receive data from right neighbour to fill our ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
+        ! CALL MPI_Recv(right_recv_buffer, &
+        !               ROWS_PER_MPI_PROCESS, &
+        !               MPI_DOUBLE_PRECISION, &
+        !               right_neighbour_rank, &
+        !               left_send_tag, &
+        !               MPI_COMM_WORLD, &
+        !               MPI_STATUS_IGNORE, &
+        !               ierr)
+        ! if (right_neighbour_rank == MPI_PROC_NULL) then
+        !     right_recv_buffer = temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1)
+        ! endif
 
-        ! Receive data from left neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
-        CALL MPI_Recv(left_recv_buffer, &
-                      ROWS_PER_MPI_PROCESS, &
-                      MPI_DOUBLE_PRECISION, &
-                      left_neighbour_rank, &
-                      right_send_tag, &
-                      MPI_COMM_WORLD, &
-                      MPI_STATUS_IGNORE, &
-                      ierr)
-        if (right_neighbour_rank == MPI_PROC_NULL) then
-            left_recv_buffer = temperatures_last(0,0)
-        endif
+        ! ! Receive data from left neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
+        ! CALL MPI_Recv(left_recv_buffer, &
+        !               ROWS_PER_MPI_PROCESS, &
+        !               MPI_DOUBLE_PRECISION, &
+        !               left_neighbour_rank, &
+        !               right_send_tag, &
+        !               MPI_COMM_WORLD, &
+        !               MPI_STATUS_IGNORE, &
+        !               ierr)
+        ! if (right_neighbour_rank == MPI_PROC_NULL) then
+        !     left_recv_buffer = temperatures_last(0,0)
+        ! endif
         
-        temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1) = right_recv_buffer
-        temperatures_last(:,0) = left_recv_buffer
+        ! temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1) = right_recv_buffer
+        ! temperatures_last(:,0) = left_recv_buffer
 
         ! /////////////////////////////////////////////
         ! // -- SUBTASK 2: PROPAGATE TEMPERATURES -- //
