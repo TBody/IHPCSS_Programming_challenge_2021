@@ -219,8 +219,8 @@ PROGRAM main
             left_recv_buffer = temperatures_last(0,0)
         endif
         
-        temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1) = right_recv_buffer
-        temperatures_last(0,0) = left_recv_buffer
+        temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1) = right_recv_buffer
+        temperatures_last(:,0) = left_recv_buffer
 
         ! /////////////////////////////////////////////
         ! // -- SUBTASK 2: PROPAGATE TEMPERATURES -- //
