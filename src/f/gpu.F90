@@ -225,8 +225,8 @@ PROGRAM main
         ! /////////////////////////////////////////////
         ! // -- SUBTASK 2: PROPAGATE TEMPERATURES -- //
         ! /////////////////////////////////////////////
-        do i = 1, ROWS_PER_MPI_PROCESS
-            do j = 1, COLUMNS_PER_MPI_PROCESS
+        do j = 1, COLUMNS_PER_MPI_PROCESS
+            do i = 1, ROWS_PER_MPI_PROCESS
                 if (temperatures(i,j) == MAX_TEMPERATURE) then
                     CYCLE
                 elseif (i == 0) then
