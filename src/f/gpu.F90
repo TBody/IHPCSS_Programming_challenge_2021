@@ -56,7 +56,8 @@ PROGRAM main
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
 
     ! MPI values
-    integer :: left_tag, right_tag
+    integer, parameter :: left_send_tag = 100
+    integer, parameter :: right_send_tag = 101
     integer :: left_send_request, right_send_request
   
     CALL MPI_Init(ierr)
@@ -165,24 +166,24 @@ PROGRAM main
         ! -- SUBTASK 1: EXCHANGE GHOST CELLS -- //
         ! ////////////////////////////////////////
 
-        ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI send will do nothing.
+        ! Send data to left neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI send will do nothing.
         call MPI_Isend(&
                 temperatures(0,1), &
                 ROWS_PER_MPI_PROCESS, &
                 MPI_DOUBLE_PRECISION, &
                 left_neighbour_rank, &
-                left_tag, &
+                left_send_tag, &
                 MPI_COMM_WORLD, &
                 left_send_request, &
                 ierr)
         
-        ! Send data to down neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
+        ! Send data to right neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
         call MPI_Isend(&
                 temperatures(0, COLUMNS_PER_MPI_PROCESS), &
                 ROWS_PER_MPI_PROCESS, &
                 MPI_DOUBLE_PRECISION, &
                 right_neighbour_rank, &
-                right_tag, &
+                right_send_tag, &
                 MPI_COMM_WORLD, &
                 right_send_request, &
                 ierr)
@@ -192,17 +193,29 @@ PROGRAM main
         ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
         ! CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, 0, MPI_COMM_WORLD, ierr)
 
-        ! Receive data from down neighbour to fill our ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
-        CALL MPI_Recv(temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
-                      MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        ! Receive data from right neighbour to fill our ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
+        CALL MPI_Recv(temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1), &
+                      ROWS_PER_MPI_PROCESS, &
+                      MPI_DOUBLE_PRECISION, &
+                      right_neighbour_rank, &
+                      left_send_tag, &
+                      MPI_COMM_WORLD, &
+                      MPI_STATUS_IGNORE, &
+                      ierr)
 
         ! Send data to down neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
         ! CALL MPI_Ssend(temperatures(0, COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, 0,&
         !                MPI_COMM_WORLD, ierr)
 
-        ! Receive data from up neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
-        CALL MPI_Recv(temperatures_last(0,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, MPI_ANY_TAG, MPI_COMM_WORLD, &
-                      MPI_STATUS_IGNORE, ierr)
+        ! Receive data from left neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
+        CALL MPI_Recv(temperatures_last(0,0), &
+                      ROWS_PER_MPI_PROCESS, &
+                      MPI_DOUBLE_PRECISION, &
+                      left_neighbour_rank, &
+                      right_send_tag, &
+                      MPI_COMM_WORLD, &
+                      MPI_STATUS_IGNORE, &
+                      ierr)
 
         ! /////////////////////////////////////////////
         ! // -- SUBTASK 2: PROPAGATE TEMPERATURES -- //
