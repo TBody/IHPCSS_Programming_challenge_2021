@@ -54,6 +54,10 @@ PROGRAM main
     REAL(8) :: subtotal
     !> The last snapshot made
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
+
+    ! MPI values
+    integer :: left_tag, right_tag
+    integer :: left_send_request, right_send_request
   
     CALL MPI_Init(ierr)
 
@@ -136,11 +140,14 @@ PROGRAM main
     end block
 
     ! Copy the temperatures into the current iteration temperature as well
+    !!$acc enter data copyin(temperatures_last) create(temperatures)
+    !!$acc kernels
     DO j = 1, COLUMNS_PER_MPI_PROCESS
         DO i = 0, ROWS_PER_MPI_PROCESS - 1
             temperatures(i,j) = temperatures_last(i,j)
         ENDDO
     ENDDO
+    !!$acc end kernels
 
     IF (my_rank == MASTER_PROCESS_RANK) THEN
         WRITE(*,*) 'Data acquisition complete.'
@@ -158,16 +165,40 @@ PROGRAM main
         ! -- SUBTASK 1: EXCHANGE GHOST CELLS -- //
         ! ////////////////////////////////////////
 
+        ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI send will do nothing.
+        call MPI_Isend(&
+                temperatures(0,1), &
+                ROWS_PER_MPI_PROCESS, &
+                MPI_DOUBLE_PRECISION, &
+                left_neighbour_rank, &
+                left_tag, &
+                MPI_COMM_WORLD, &
+                left_send_request, &
+                ierr)
+        
+        ! Send data to down neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
+        call MPI_Isend(&
+                temperatures(0, COLUMNS_PER_MPI_PROCESS), &
+                ROWS_PER_MPI_PROCESS, &
+                MPI_DOUBLE_PRECISION, &
+                right_neighbour_rank, &
+                right_tag, &
+                MPI_COMM_WORLD, &
+                right_send_request, &
+                ierr)
+
+
+
         ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, 0, MPI_COMM_WORLD, ierr)
+        ! CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, 0, MPI_COMM_WORLD, ierr)
 
         ! Receive data from down neighbour to fill our ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
         CALL MPI_Recv(temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
                       MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
         ! Send data to down neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        CALL MPI_Ssend(temperatures(0, COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, 0,&
-                       MPI_COMM_WORLD, ierr)
+        ! CALL MPI_Ssend(temperatures(0, COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, 0,&
+        !                MPI_COMM_WORLD, ierr)
 
         ! Receive data from up neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
         CALL MPI_Recv(temperatures_last(0,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, MPI_ANY_TAG, MPI_COMM_WORLD, &
