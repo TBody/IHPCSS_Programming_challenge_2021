@@ -124,23 +124,16 @@ PROGRAM main
 
     END IF
 
+    !$acc data create(temperatures) copyin(temperatures_last)
     ! Copy the temperatures into the current iteration temperature as well
+    !$acc kernels
     DO j = 1, COLUMNS_PER_MPI_PROCESS
         DO i = 0, ROWS_PER_MPI_PROCESS - 1
             temperatures(i,j) = temperatures_last(i,j)
         ENDDO
     ENDDO
+    !$acc end kernels
 
-    IF (my_rank == MASTER_PROCESS_RANK) THEN
-        WRITE(*,*) 'Data acquisition complete.'
-    END IF
-
-    ! /////////////////////////////
-    ! // TASK 2: DATA PROCESSING //
-    ! /////////////////////////////
-
-    
-    !$acc data copyin(temperatures) copyin(temperatures_last)
     DO WHILE (total_time_so_far .LT. MAX_TIME)
         ! ////////////////////////////////////////
         ! -- SUBTASK 1: EXCHANGE GHOST CELLS -- //
