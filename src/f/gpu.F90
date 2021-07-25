@@ -106,13 +106,16 @@ PROGRAM main
 
     !$acc data create(temperatures,temperatures_last)
     IF (my_rank .EQ. MASTER_PROCESS_RANK) THEN
+
+        !$acc enter data copyin(all_temperatures(0:ROWS_PER_MPI_PROCESS - 1, 0:COLUMNS_PER_MPI_PROCESS - 1)) async(0)
         DO i = 0, comm_size-1
             CALL MPI_Isend(all_temperatures(0,i * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
                                MPI_DOUBLE_PRECISION, i, 0, MPI_COMM_WORLD, send_request(i), ierr)
         ENDDO
 
         !Once sends have started, copy values
-        !$acc kernels copyin(all_temperatures(0:ROWS_PER_MPI_PROCESS - 1, 0:COLUMNS_PER_MPI_PROCESS - 1))
+        !$acc wait(0)
+        !$acc kernels present(all_temperatures(0:ROWS_PER_MPI_PROCESS - 1, 0:COLUMNS_PER_MPI_PROCESS - 1))
         DO k = 1, COLUMNS_PER_MPI_PROCESS
            DO j = 0, ROWS_PER_MPI_PROCESS - 1
                temperatures_last(j,k) = all_temperatures(j,k-1)
