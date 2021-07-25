@@ -134,7 +134,7 @@ PROGRAM main
     ! /////////////////////////////
 
     
-    !!$acc data copyin(temperatures) copyin(temperatures_last)
+    !$acc data copyin(temperatures) copyin(temperatures_last)
     DO WHILE (total_time_so_far .LT. MAX_TIME)
         ! ////////////////////////////////////////
         ! -- SUBTASK 1: EXCHANGE GHOST CELLS -- //
@@ -155,7 +155,7 @@ PROGRAM main
         CALL MPI_Recv(temperatures_last(0,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, MPI_ANY_TAG, MPI_COMM_WORLD, &
                       MPI_STATUS_IGNORE, ierr)
         
-        !!$acc update device(temperatures_last)
+        !$acc update device(temperatures_last)
 
         ! /////////////////////////////////////////////
         ! // -- SUBTASK 2: PROPAGATE TEMPERATURES -- //
@@ -185,6 +185,8 @@ PROGRAM main
             END IF
         END DO
         !$acc end kernels
+
+        !$acc update host(temperatures)
 
         ! ///////////////////////////////////////////////////////
         ! // -- SUBTASK 3: CALCULATE MAX TEMPERATURE CHANGE -- //
@@ -233,19 +235,16 @@ PROGRAM main
         ! //////////////////////////////////////////////////
         ! // -- SUBTASK 5: UPDATE LAST ITERATION ARRAY -- //
         ! //////////////////////////////////////////////////
-        !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
                 temperatures_last(i,j) = temperatures(i,j)
             END DO
         END DO
-        !$acc end kernels
 
         ! ///////////////////////////////////
         ! // -- SUBTASK 6: GET SNAPSHOT -- //
         ! ///////////////////////////////////
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
-            !!$acc update host(temperatures)
             IF (my_rank == MASTER_PROCESS_RANK) THEN
                 DO j = 0, comm_size-1
                     IF (j .EQ. my_rank) THEN
@@ -280,7 +279,7 @@ PROGRAM main
         ! Update the iteration number
         iteration_count = iteration_count + 1
     END DO
-    !!$acc end data
+    !$acc end data
 
     ! ///////////////////////////////////////////////
     ! //     ^                                     //
