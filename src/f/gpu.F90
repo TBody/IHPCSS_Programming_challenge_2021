@@ -7,6 +7,7 @@
 PROGRAM main
     USE util
     USE mpi
+    use openacc
 
     IMPLICIT NONE
    
@@ -54,15 +55,25 @@ PROGRAM main
     REAL(8) :: subtotal
     !> The last snapshot made
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
-  
+    integer, dimension(:), allocatable :: send_request
+    integer :: ndev, idev
+    
     CALL MPI_Init(ierr)
+    
+    !!$acc declare create(temperature, temperature_last)
 
     ! /////////////////////////////////////////////////////
     ! ! -- PREPARATION 1: COLLECT USEFUL INFORMATION -- //
     ! /////////////////////////////////////////////////////
     CALL MPI_Comm_rank(MPI_COMM_WORLD, my_rank, ierr)
+    
+    ndev = acc_get_num_devices(acc_device_nvidia)
+    idev = mod(my_rank, ndev)
+    call acc_set_device_num(idev, acc_device_nvidia)
 
     CALL MPI_Comm_size(MPI_COMM_WORLD, comm_size, ierr)
+    allocate(send_request(0:comm_size - 1))
+
     LAST_PROCESS_RANK = comm_size - 1
 
     left_neighbour_rank = merge(MPI_PROC_NULL, my_rank - 1, my_rank .EQ. FIRST_PROCESS_RANK)
@@ -93,32 +104,25 @@ PROGRAM main
     ! ////////////////////////////////////////////////////////
     start_time = MPI_Wtime()
 
-    block
-    integer, dimension(0:comm_size-1) :: send_request
-
     IF (my_rank .EQ. MASTER_PROCESS_RANK) THEN
         DO i = 0, comm_size-1
-            ! Is the i'th chunk meant for me, the master MPI process?
-            IF (i .NE. my_rank) THEN
-                ! No, so send the corresponding chunk to that MPI process.
-                CALL MPI_Isend(all_temperatures(0,i * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
+            CALL MPI_Isend(all_temperatures(0,i * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
                                MPI_DOUBLE_PRECISION, i, 0, MPI_COMM_WORLD, send_request(i), ierr)
-            ELSE
-                ! Yes, let's copy it straight for the array in which we read the file into.
-                DO k = 1, COLUMNS_PER_MPI_PROCESS
-                    DO j = 0, ROWS_PER_MPI_PROCESS - 1
-                        temperatures_last(j,k) = all_temperatures(j,k-1)
-                    ENDDO
-                ENDDO
-                send_request(0) = MPI_SUCCESS
-            END IF
         ENDDO
+
+        !Once sends have started, copy values
+        DO k = 1, COLUMNS_PER_MPI_PROCESS
+           DO j = 0, ROWS_PER_MPI_PROCESS - 1
+               temperatures_last(j,k) = all_temperatures(j,k-1)
+           ENDDO
+        ENDDO
+        send_request(0) = MPI_SUCCESS
     ELSE
         ! Receive my chunk.
         CALL MPI_Recv(temperatures_last(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
                       MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+
     END IF
-    end block
 
     ! Copy the temperatures into the current iteration temperature as well
     DO j = 1, COLUMNS_PER_MPI_PROCESS
@@ -131,9 +135,6 @@ PROGRAM main
         WRITE(*,*) 'Data acquisition complete.'
     END IF
 
-    ! Wait for everybody to receive their part before we can start processing
-    CALL MPI_Barrier(MPI_COMM_WORLD, ierr)
-    
     ! /////////////////////////////
     ! // TASK 2: DATA PROCESSING //
     ! /////////////////////////////
