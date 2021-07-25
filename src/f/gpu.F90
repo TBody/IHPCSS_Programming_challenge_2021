@@ -162,6 +162,7 @@ PROGRAM main
         ! /////////////////////////////////////////////
         ! // -- SUBTASK 2: PROPAGATE TEMPERATURES -- //
         ! /////////////////////////////////////////////
+        my_temperature_change = 0.0
         !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS 
             ! Process the cell at the first row, which has no up neighbour
@@ -186,27 +187,11 @@ PROGRAM main
                                                           temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) / 3.0
             END IF
         END DO
-        !$acc end kernels
-
-        !!$acc update host(temperatures)
-
-        ! ///////////////////////////////////////////////////////
-        ! // -- SUBTASK 3: CALCULATE MAX TEMPERATURE CHANGE -- //
-        ! ///////////////////////////////////////////////////////
-        my_temperature_change = 0.0
-        !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
                  my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)
             END DO
         END DO
-        !$acc end kernels
-
-
-        ! //////////////////////////////////////////////////
-        ! // -- SUBTASK 5: UPDATE LAST ITERATION ARRAY -- //
-        ! //////////////////////////////////////////////////
-        !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
                 temperatures_last(i,j) = temperatures(i,j)
