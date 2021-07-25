@@ -104,6 +104,7 @@ PROGRAM main
     ! ////////////////////////////////////////////////////////
     start_time = MPI_Wtime()
 
+    !$acc data create(temperatures,temperatures_last)
     IF (my_rank .EQ. MASTER_PROCESS_RANK) THEN
         DO i = 0, comm_size-1
             CALL MPI_Isend(all_temperatures(0,i * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
@@ -111,20 +112,23 @@ PROGRAM main
         ENDDO
 
         !Once sends have started, copy values
+        !$acc kernels copyin(all_temperatures(0:ROWS_PER_MPI_PROCESS - 1, 0:COLUMNS_PER_MPI_PROCESS - 1))
         DO k = 1, COLUMNS_PER_MPI_PROCESS
            DO j = 0, ROWS_PER_MPI_PROCESS - 1
                temperatures_last(j,k) = all_temperatures(j,k-1)
            ENDDO
         ENDDO
+        !$acc end kernels
         send_request(0) = MPI_SUCCESS
+
     ELSE
         ! Receive my chunk.
         CALL MPI_Recv(temperatures_last(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
                       MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        !$acc update device(temperatures_last)
 
     END IF
 
-    !$acc data create(temperatures) copyin(temperatures_last)
     ! Copy the temperatures into the current iteration temperature as well
     !$acc kernels
     DO j = 1, COLUMNS_PER_MPI_PROCESS
