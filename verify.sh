@@ -54,6 +54,8 @@ echo "  - OUTPUT_FILE = the path to the file in which store the output.";
 echo "  - Example: to submit the C CPU version on the small dataset, submit './submit.sh c cpu small'.";
 echo "";
 
+echo "Command executing this script: $0 $@"
+
 #################################
 # Check the number of arguments #
 #################################
@@ -71,7 +73,7 @@ all_languages=`echo ${languages[@]}`;
 is_in_array languages $1
 language_retrieved=$?;
 if [ "${language_retrieved}" == "0" ]; then
-	echo_success "The language passed is correct.";
+	echo_success "The language passed is correct ('$1').";
 else
 	echo_failure "The language '$1' is unknown. It must be one of: ${all_languages}.";
 fi
@@ -84,7 +86,7 @@ all_implementations=`echo ${implementations[@]}`;
 is_in_array implementations $2
 implementation_retrieved=$?;
 if [ "${implementation_retrieved}" == "0" ]; then
-	echo_success "The implementation passed is correct.";
+	echo_success "The implementation passed is correct (\"$2\").";
 else
 	echo_failure "The implementation '$2' is unknown. It must be one of: ${all_implementations}.";
 fi
@@ -97,7 +99,7 @@ all_sizes=`echo ${sizes[@]}`;
 is_in_array sizes $3
 size_retrieved=$?;
 if [ "${size_retrieved}" == "0" ]; then
-	echo_success "The size passed is correct.";
+	echo_success "The size passed is correct (\"$3\").";
 else
 	echo_failure "The size '$3' is unknown. It must be one of: ${all_sizes}.";
 fi
@@ -105,12 +107,35 @@ fi
 #########################################################
 # Check that the corresponding submission script exists #
 #########################################################
-slurm_scripts_path="./slurm_scripts";
-slurm_script_to_submit="${slurm_scripts_path}/$2_$3.slurm";
-if [ -f "${slurm_script_to_submit}" ]; then
-	echo_success "The corresponding submission script \"${slurm_script_to_submit}\" has been found."
+reference_file="./reference/$1/$2_$3.txt";
+if [ -f "${reference_file}" ]; then
+	echo_success "The corresponding reference file \"${reference_file}\" has been found."
 else
-	echo_failure "The corresponding submission script \"${slurm_script_to_submit}\" has not been found."
+	echo_failure "The corresponding reference file \"${reference_file}\" has not been found."
 fi
 
-sbatch ${slurm_script_to_submit} $1 $4
+reference_iterations_string=`cat ${reference_file} | grep "Iteration" | cut -d ' ' -f 3`;
+reference_iterations=($reference_iterations_string)
+reference_iterations_count=${#reference_iterations[@]}
+reference_iteration_achieved=`cat ${reference_file} | grep "iterations" | cut -d ' ' -f 10`;
+
+iterations_to_verify_string=`cat $4 | grep "Iteration" | cut -d ' ' -f 3`;
+iterations_to_verify=($iterations_to_verify_string)
+iterations_to_verify_count=${#reference_iterations[@]}
+iterations_to_verify_achieved=`cat $4 | grep "iterations" | cut -d ' ' -f 10`;
+
+iteration=0
+for i in ${!iterations_to_verify[@]}; do
+	let iteration_index="$i * 25";
+	if [ ${iteration_index} -gt ${reference_iterations_count} ]; then
+		echo_success "Your version ran more iterations than the reference; keep in mind that the extra iterations your program has run could not be checked against the reference. Please inform the programming challenge organiser to provide longer reference files."
+		break;
+	fi
+	if [ ! "${reference_iterations[$i]}" = "${iterations_to_verify[$i]}" ]; then
+		echo_failure "Iteration $i differs: ${reference_iterations[$i]} (reference) vs ${iterations_to_verify[$i]} (you)";
+	fi
+	let iteration="${iteration} + 25";
+done
+
+echo_success "All iterations compared are identical to the reference."
+echo_success "Number of iterations achieved: ${reference_iteration_achieved} (reference) vs ${iterations_to_verify_achieved} (you).";
