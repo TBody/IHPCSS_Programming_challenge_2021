@@ -204,7 +204,6 @@ PROGRAM main
         ! // -- SUBTASK 4: FIND MAX TEMPERATURE CHANGE OVERALL -- //
         ! //////////////////////////////////////////////////////////
 
-        call MPI_reduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MASTER_PROCESS_RANK, MPI_COMM_WORLD, ierr)
 
         ! //////////////////////////////////////////////////
         ! // -- SUBTASK 5: UPDATE LAST ITERATION ARRAY -- //
@@ -219,6 +218,7 @@ PROGRAM main
         ! // -- SUBTASK 6: GET SNAPSHOT -- //
         ! ///////////////////////////////////
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
+            call MPI_reduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MASTER_PROCESS_RANK, MPI_COMM_WORLD, ierr)
             IF (my_rank == MASTER_PROCESS_RANK) THEN
                 DO j = 0, comm_size-1
                     IF (j .EQ. my_rank) THEN
