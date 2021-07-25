@@ -93,13 +93,16 @@ PROGRAM main
     ! ////////////////////////////////////////////////////////
     start_time = MPI_Wtime()
 
+    block
+    integer, dimension(0:comm_size-1) :: send_request
+
     IF (my_rank .EQ. MASTER_PROCESS_RANK) THEN
         DO i = 0, comm_size-1
             ! Is the i'th chunk meant for me, the master MPI process?
             IF (i .NE. my_rank) THEN
                 ! No, so send the corresponding chunk to that MPI process.
-                CALL MPI_Ssend(all_temperatures(0,i * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
-                               MPI_DOUBLE_PRECISION, i, 0, MPI_COMM_WORLD, ierr)
+                CALL MPI_Isend(all_temperatures(0,i * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
+                               MPI_DOUBLE_PRECISION, i, 0, MPI_COMM_WORLD, send_request(i), ierr)
             ELSE
                 ! Yes, let's copy it straight for the array in which we read the file into.
                 DO k = 1, COLUMNS_PER_MPI_PROCESS
@@ -107,6 +110,7 @@ PROGRAM main
                         temperatures_last(j,k) = all_temperatures(j,k-1)
                     ENDDO
                 ENDDO
+                send_request(0) = MPI_SUCCESS
             END IF
         ENDDO
     ELSE
@@ -114,6 +118,7 @@ PROGRAM main
         CALL MPI_Recv(temperatures_last(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
                       MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
     END IF
+    end block
 
     ! Copy the temperatures into the current iteration temperature as well
     DO j = 1, COLUMNS_PER_MPI_PROCESS
