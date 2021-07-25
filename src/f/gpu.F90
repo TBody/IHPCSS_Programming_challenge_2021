@@ -56,6 +56,7 @@ PROGRAM main
     !> The last snapshot made
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
     integer, dimension(:), allocatable :: send_request
+    real(8), parameter :: one_third = 1.0_8 / 3.0_8
     integer :: ndev, idev
     
     CALL MPI_Init(ierr)
@@ -174,7 +175,7 @@ PROGRAM main
             ! Process the cell at the first row, which has no up neighbour
                 temperatures(0,j) = (temperatures_last(0,j-1) + &
                                      temperatures_last(0,j+1) + &
-                                     temperatures_last(1,j  )) / 3.0
+                                     temperatures_last(1,j  )) * one_third 
             ! Process all cells between the first and last columns excluded, which each has both left and right neighbours
             DO i = 1, ROWS_PER_MPI_PROCESS - 2
                     temperatures(i,j) = 0.25 * (temperatures_last(i-1,j  ) + &
@@ -185,7 +186,7 @@ PROGRAM main
             ! Process the cell at the bottom row, which has no down neighbour
                 temperatures(ROWS_PER_MPI_PROCESS-1,j) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, j - 1) + &
                                                           temperatures_last(ROWS_PER_MPI_PROCESS-1, j + 1) + &
-                                                          temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) / 3.0
+                                                          temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) * one_third
         END DO
         temperatures = merge(temperatures, temperatures_last, temperatures_last /= MAX_TEMPERATURE)
         DO j = 1, COLUMNS_PER_MPI_PROCESS
