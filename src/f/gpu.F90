@@ -55,7 +55,7 @@ PROGRAM main
     REAL(8) :: subtotal
     !> The last snapshot made
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
-    integer, dimension(:), allocatable :: send_request
+    integer, dimension(:), allocatable :: send_request, snapshot_request
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
     integer :: ndev, idev
     
@@ -73,7 +73,7 @@ PROGRAM main
     call acc_set_device_num(idev, acc_device_nvidia)
 
     CALL MPI_Comm_size(MPI_COMM_WORLD, comm_size, ierr)
-    allocate(send_request(0:comm_size - 1))
+    allocate(send_request(0:comm_size - 1), snapshot_request(0:comm_size - 1))
 
     LAST_PROCESS_RANK = comm_size - 1
 
@@ -201,21 +201,27 @@ PROGRAM main
         ! // -- SUBTASK 6: GET SNAPSHOT -- //
         ! ///////////////////////////////////
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
-            call MPI_reduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, MASTER_PROCESS_RANK, MPI_COMM_WORLD, ierr)
+            call MPI_ireduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+                             MASTER_PROCESS_RANK, MPI_COMM_WORLD, snapshot_request(0), ierr)
+            
             IF (my_rank == MASTER_PROCESS_RANK) THEN
-                DO j = 0, comm_size-1
-                    IF (j .EQ. my_rank) THEN
-                        ! Copy locally my own temperature array in the global one
-                        DO k = 0, ROWS_PER_MPI_PROCESS-1
-                            DO l = 0, COLUMNS_PER_MPI_PROCESS-1
-                                snapshot(j * ROWS_PER_MPI_PROCESS + k,l) = temperatures(k + 1,l)
-                            END DO
-                        END DO
-                    ELSE
-                        CALL MPI_Recv(snapshot(0, j * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
-                                      MPI_DOUBLE_PRECISION, j, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    END IF
+                
+                ! Copy locally my own temperature array in the global one
+                !$acc kernels copyout(snapshot(0:ROWS_PER_MPI_PROCESS-1, 0:COLUMNS_PER_MPI_PROCESS-1)) async(2)
+                DO k = 0, ROWS_PER_MPI_PROCESS-1
+                    DO l = 0, COLUMNS_PER_MPI_PROCESS-1
+                        snapshot(k,l) = temperatures(k + 1,l)
+                    END DO
                 END DO
+                !$acc end kernels
+                
+                DO j = 1, comm_size-1
+                     CALL MPI_Recv(snapshot(0, j * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
+                                    MPI_DOUBLE_PRECISION, j, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+                ENDDO
+                !$acc wait(2)
+                CALL MPI_WAIT(snapshot_request(0), MPI_STATUS_IGNORE, ierr)
+                !CALL MPI_WAITALL(comm_size, snapshot_request, MPI_STATUSES_IGNORE, ierr)
 
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
             ELSE
