@@ -166,27 +166,22 @@ PROGRAM main
         !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS 
             ! Process the cell at the first row, which has no up neighbour
-            IF (temperatures(0,j) .NE. MAX_TEMPERATURE) THEN
                 temperatures(0,j) = (temperatures_last(0,j-1) + &
                                      temperatures_last(0,j+1) + &
                                      temperatures_last(1,j  )) / 3.0
-            END IF
             ! Process all cells between the first and last columns excluded, which each has both left and right neighbours
             DO i = 1, ROWS_PER_MPI_PROCESS - 2
-                IF (temperatures(i,j) .NE. MAX_TEMPERATURE) THEN
                     temperatures(i,j) = 0.25 * (temperatures_last(i-1,j  ) + &
                                                 temperatures_last(i+1,j  ) + &
                                                 temperatures_last(i  ,j-1) + &
                                                 temperatures_last(i  ,j+1))
-                END IF
             END DO
             ! Process the cell at the bottom row, which has no down neighbour
-            IF (temperatures(ROWS_PER_MPI_PROCESS-1,j) .NE. MAX_TEMPERATURE) THEN
                 temperatures(ROWS_PER_MPI_PROCESS-1,j) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, j - 1) + &
                                                           temperatures_last(ROWS_PER_MPI_PROCESS-1, j + 1) + &
                                                           temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) / 3.0
-            END IF
         END DO
+        temperatures = merge(temperatures, temperatures_last, temperatures_last /= MAX_TEMPERATURE)
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
                  my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)

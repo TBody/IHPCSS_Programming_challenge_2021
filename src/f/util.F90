@@ -4,7 +4,7 @@ MODULE util
 #ifdef BIG
     REAL(8), PARAMETER :: MAX_TIME = 30.0
 #else 
-    REAL(8), PARAMETER :: MAX_TIME = 5.0
+    REAL(8), PARAMETER :: MAX_TIME = 10.0
 #endif
     INTEGER, PARAMETER :: SNAPSHOT_INTERVAL = 25
 
