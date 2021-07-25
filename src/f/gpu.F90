@@ -139,6 +139,8 @@ PROGRAM main
         ! ////////////////////////////////////////
         ! -- SUBTASK 1: EXCHANGE GHOST CELLS -- //
         ! ////////////////////////////////////////
+        
+        !$acc update host(temperatures, temperatures_last)
 
         ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
         CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, 0, MPI_COMM_WORLD, ierr)
@@ -186,7 +188,7 @@ PROGRAM main
         END DO
         !$acc end kernels
 
-        !$acc update host(temperatures)
+        !!$acc update host(temperatures)
 
         ! ///////////////////////////////////////////////////////
         ! // -- SUBTASK 3: CALCULATE MAX TEMPERATURE CHANGE -- //
@@ -200,19 +202,17 @@ PROGRAM main
         END DO
         !$acc end kernels
 
-        ! //////////////////////////////////////////////////////////
-        ! // -- SUBTASK 4: FIND MAX TEMPERATURE CHANGE OVERALL -- //
-        ! //////////////////////////////////////////////////////////
-
 
         ! //////////////////////////////////////////////////
         ! // -- SUBTASK 5: UPDATE LAST ITERATION ARRAY -- //
         ! //////////////////////////////////////////////////
+        !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
                 temperatures_last(i,j) = temperatures(i,j)
             END DO
         END DO
+        !$acc end kernels
 
         ! ///////////////////////////////////
         ! // -- SUBTASK 6: GET SNAPSHOT -- //
