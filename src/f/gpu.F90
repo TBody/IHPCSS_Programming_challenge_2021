@@ -184,11 +184,7 @@ PROGRAM main
         temperatures = merge(temperatures, temperatures_last, temperatures_last /= MAX_TEMPERATURE)
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
-                 my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)
-            END DO
-        END DO
-        DO j = 1, COLUMNS_PER_MPI_PROCESS
-            DO i = 0, ROWS_PER_MPI_PROCESS - 1
+                my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)
                 temperatures_last(i,j) = temperatures(i,j)
             END DO
         END DO
