@@ -133,6 +133,8 @@ PROGRAM main
     ! // TASK 2: DATA PROCESSING //
     ! /////////////////////////////
 
+    
+    !$acc data copyin(temperatures) copyin(temperatures_last)
     DO WHILE (total_time_so_far .LT. MAX_TIME)
         ! ////////////////////////////////////////
         ! -- SUBTASK 1: EXCHANGE GHOST CELLS -- //
@@ -152,10 +154,13 @@ PROGRAM main
         ! Receive data from up neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
         CALL MPI_Recv(temperatures_last(0,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, MPI_ANY_TAG, MPI_COMM_WORLD, &
                       MPI_STATUS_IGNORE, ierr)
+        
+        !$acc update device(temperatures_last)
 
         ! /////////////////////////////////////////////
         ! // -- SUBTASK 2: PROPAGATE TEMPERATURES -- //
         ! /////////////////////////////////////////////
+        !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS 
             ! Process the cell at the first row, which has no up neighbour
             IF (temperatures(0,j) .NE. MAX_TEMPERATURE) THEN
@@ -179,16 +184,19 @@ PROGRAM main
                                                           temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) / 3.0
             END IF
         END DO
+        !$acc end kernels
 
         ! ///////////////////////////////////////////////////////
         ! // -- SUBTASK 3: CALCULATE MAX TEMPERATURE CHANGE -- //
         ! ///////////////////////////////////////////////////////
         my_temperature_change = 0.0
+        !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
                  my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)
             END DO
         END DO
+        !$acc end kernels
 
         ! //////////////////////////////////////////////////////////
         ! // -- SUBTASK 4: FIND MAX TEMPERATURE CHANGE OVERALL -- //
@@ -225,16 +233,19 @@ PROGRAM main
         ! //////////////////////////////////////////////////
         ! // -- SUBTASK 5: UPDATE LAST ITERATION ARRAY -- //
         ! //////////////////////////////////////////////////
+        !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
                 temperatures_last(i,j) = temperatures(i,j)
             END DO
         END DO
+        !$acc end kernels
 
         ! ///////////////////////////////////
         ! // -- SUBTASK 6: GET SNAPSHOT -- //
         ! ///////////////////////////////////
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
+            !$acc update host(temperatures)
             IF (my_rank == MASTER_PROCESS_RANK) THEN
                 DO j = 0, comm_size-1
                     IF (j .EQ. my_rank) THEN
@@ -269,6 +280,7 @@ PROGRAM main
         ! Update the iteration number
         iteration_count = iteration_count + 1
     END DO
+    !$acc end data
 
     ! ///////////////////////////////////////////////
     ! //     ^                                     //
