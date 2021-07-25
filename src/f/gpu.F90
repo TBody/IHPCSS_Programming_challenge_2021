@@ -140,7 +140,7 @@ PROGRAM main
         ! -- SUBTASK 1: EXCHANGE GHOST CELLS -- //
         ! ////////////////////////////////////////
         
-        !$acc update host(temperatures, temperatures_last)
+        !$acc update host(temperatures(:,1), temperatures(:,COLUMNS_PER_MPI_PROCESS))
 
         ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
         CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, 0, MPI_COMM_WORLD, ierr)
@@ -157,7 +157,7 @@ PROGRAM main
         CALL MPI_Recv(temperatures_last(0,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, MPI_ANY_TAG, MPI_COMM_WORLD, &
                       MPI_STATUS_IGNORE, ierr)
         
-        !$acc update device(temperatures_last)
+        !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
 
         ! /////////////////////////////////////////////
         ! // -- SUBTASK 2: PROPAGATE TEMPERATURES -- //
