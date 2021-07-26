@@ -79,7 +79,7 @@ PROGRAM main
 
     do i = 0, comm_size - 1
         sendcounts(i) = ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS
-        displs(i) = (ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS + 2)*j
+        displs(i) = (ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS + 0)*j
     enddo
     
     LAST_PROCESS_RANK = comm_size - 1
@@ -97,8 +97,8 @@ PROGRAM main
         CALL initialise_temperatures(all_temperatures)
     END IF
 
-    CALL MPI_Barrier(MPI_COMM_WORLD, ierr)
 
+    CALL MPI_Barrier(MPI_COMM_WORLD, ierr)
     ! ///////////////////////////////////////////
     ! !     ^                                 //
     ! !    / \                                //
@@ -112,48 +112,15 @@ PROGRAM main
     ! ////////////////////////////////////////////////////////
     start_time = MPI_Wtime()
 
-    !$acc data create(temperatures,temperatures_last)
+    CALL MPI_scatter(all_temperatures, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
+                     temperatures_last(0, 1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
+                     MPI_COMM_WORLD, ierr)
     
-    IF (.false.) then
-    IF (my_rank .EQ. MASTER_PROCESS_RANK) THEN
-
-        !$acc enter data copyin(all_temperatures(0:ROWS_PER_MPI_PROCESS - 1, 0:COLUMNS_PER_MPI_PROCESS - 1)) async(0)
-        DO i = 0, comm_size-1
-            CALL MPI_Isend(all_temperatures(0,i * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
-                               MPI_DOUBLE_PRECISION, i, 0, MPI_COMM_WORLD, send_request(i), ierr)
-        ENDDO
-
-        !Once sends have started, copy values
-        !$acc wait(0)
-        !$acc kernels present(all_temperatures(0:ROWS_PER_MPI_PROCESS - 1, 0:COLUMNS_PER_MPI_PROCESS - 1))
-        DO k = 1, COLUMNS_PER_MPI_PROCESS
-           DO j = 0, ROWS_PER_MPI_PROCESS - 1
-               temperatures_last(j,k) = all_temperatures(j,k-1)
-           ENDDO
-        ENDDO
-        !$acc end kernels
-        send_request(0) = MPI_SUCCESS
-
-    ELSE
-        ! Receive my chunk.
-        CALL MPI_Recv(temperatures_last(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
-                      MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-        !$acc update device(temperatures_last)
-
-    END IF
-    else
-        call MPI_scatterv(all_temperatures(0,0), sendcounts, displs, MPI_DOUBLE_PRECISION, &
-               temperatures_last(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
-               MASTER_PROCESS_RANK, MPI_COMM_WORLD, ierr)
-
-       !$acc update device(temperatures_last)
-    endif
-
     ! Copy the temperatures into the current iteration temperature as well
+    !$acc data create(temperatures) copyin(temperatures_last)
     !$acc kernels
     DO j = 1, COLUMNS_PER_MPI_PROCESS
         DO i = 0, ROWS_PER_MPI_PROCESS - 1
-            !temperatures_last(i,j) = temperatures(i, j-1)
             temperatures(i,j) = temperatures_last(i,j)
         ENDDO
     ENDDO
