@@ -137,7 +137,6 @@ PROGRAM main
 
         END IF
         
-        !$acc update host(temperatures(:,1), temperatures(:,COLUMNS_PER_MPI_PROCESS))
 
         ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
         CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, 0, MPI_COMM_WORLD, ierr)
@@ -183,6 +182,7 @@ PROGRAM main
             END DO
         END DO
         !$acc end kernels
+        !$acc update host(temperatures(:,1), temperatures(:,COLUMNS_PER_MPI_PROCESS))
 
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             CALL MPI_WAITALL(3, (/ reduce_req, bcast_req, gather_req  /), MPI_STATUSES_IGNORE, ierr)
