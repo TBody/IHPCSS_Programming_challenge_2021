@@ -46,7 +46,7 @@ PROGRAM main
     !> Iterator
     INTEGER :: l
     !> Keep track of the current iteration count
-    INTEGER :: iteration_count = 0
+    INTEGER :: iteration_count = -1
     !> Maximum temperature change observed across all MPI processes
     REAL(8) :: global_temperature_change
     !> Maximum temperature change for us
@@ -119,9 +119,25 @@ PROGRAM main
     !$acc end kernels
 
     DO WHILE (total_time_so_far .LT. MAX_TIME)
-        ! ////////////////////////////////////////
-        ! -- SUBTASK 1: EXCHANGE GHOST CELLS -- //
-        ! ////////////////////////////////////////
+
+        ! Calculate the total time spent processing
+        IF (my_rank == MASTER_PROCESS_RANK) THEN
+            total_time_so_far = MPI_Wtime() - start_time
+        END IF
+
+        ! Send total timer to everybody so they too can exit the loop if more than the allowed runtime has elapsed already
+        CALL MPI_IBcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, MPI_COMM_WORLD, bcast_req, ierr)
+
+        IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
+            call MPI_ireduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+                             MASTER_PROCESS_RANK, MPI_COMM_WORLD, reduce_req, ierr)
+   
+            ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
+            call MPI_igather(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
+                    snapshot, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
+                    MASTER_PROCESS_RANK, MPI_COMM_WORLD, gather_req, ierr)
+
+        END IF
         
         !$acc update host(temperatures(:,1), temperatures(:,COLUMNS_PER_MPI_PROCESS))
 
@@ -142,9 +158,6 @@ PROGRAM main
         
         !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
 
-        ! /////////////////////////////////////////////
-        ! // -- SUBTASK 2: PROPAGATE TEMPERATURES -- //
-        ! /////////////////////////////////////////////
         my_temperature_change = 0.0
         !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS 
@@ -174,27 +187,13 @@ PROGRAM main
         !$acc end kernels
 
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
-            call MPI_ireduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-                             MASTER_PROCESS_RANK, MPI_COMM_WORLD, reduce_req, ierr)
-   
-            ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
-            call MPI_igather(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
-                    snapshot, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
-                    MASTER_PROCESS_RANK, MPI_COMM_WORLD, gather_req, ierr)
-
-            IF (my_rank == MASTER_PROCESS_RANK) THEN
-                CALL MPI_WAIT(reduce_req, MPI_STATUS_IGNORE, ierr)
+            CALL MPI_WAITALL(3, (/ reduce_req, bcast_req, gather_req  /), MPI_STATUSES_IGNORE, ierr)
+            if (my_rank == MASTER_PROCESS_RANK) then
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
-            END IF
+            endif
+        else
+            CALL MPI_WAIT(bcast_req, MPI_STATUS_IGNORE, ierr)
         END IF
-
-        ! Calculate the total time spent processing
-        IF (my_rank == MASTER_PROCESS_RANK) THEN
-            total_time_so_far = MPI_Wtime() - start_time
-        END IF
-
-        ! Send total timer to everybody so they too can exit the loop if more than the allowed runtime has elapsed already
-        CALL MPI_Bcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, MPI_COMM_WORLD, ierr)
 
         ! Update the iteration number
         iteration_count = iteration_count + 1
