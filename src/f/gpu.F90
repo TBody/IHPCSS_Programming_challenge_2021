@@ -55,8 +55,9 @@ PROGRAM main
     REAL(8) :: subtotal
     !> The last snapshot made
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
-    integer, dimension(:), allocatable :: send_request, snapshot_request
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
+    integer, dimension(:), allocatable :: send_request, snapshot_request
+    integer, dimension(:), allocatable :: sendcounts, recvcounts, displs 
     integer :: ndev, idev
     
     CALL MPI_Init(ierr)
@@ -74,7 +75,13 @@ PROGRAM main
 
     CALL MPI_Comm_size(MPI_COMM_WORLD, comm_size, ierr)
     allocate(send_request(0:comm_size - 1), snapshot_request(0:comm_size - 1))
+    allocate(sendcounts(0:comm_size - 1), recvcounts(0:comm_size - 1), displs(0:comm_size - 1))
 
+    do i = 0, comm_size - 1
+        sendcounts(i) = ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS
+        displs(i) = (ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS + 2)*j
+    enddo
+    
     LAST_PROCESS_RANK = comm_size - 1
 
     left_neighbour_rank = merge(MPI_PROC_NULL, my_rank - 1, my_rank .EQ. FIRST_PROCESS_RANK)
@@ -106,6 +113,8 @@ PROGRAM main
     start_time = MPI_Wtime()
 
     !$acc data create(temperatures,temperatures_last)
+    
+    IF (.false.) then
     IF (my_rank .EQ. MASTER_PROCESS_RANK) THEN
 
         !$acc enter data copyin(all_temperatures(0:ROWS_PER_MPI_PROCESS - 1, 0:COLUMNS_PER_MPI_PROCESS - 1)) async(0)
@@ -132,11 +141,19 @@ PROGRAM main
         !$acc update device(temperatures_last)
 
     END IF
+    else
+        call MPI_scatterv(all_temperatures(0,0), sendcounts, displs, MPI_DOUBLE_PRECISION, &
+               temperatures_last(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
+               MASTER_PROCESS_RANK, MPI_COMM_WORLD, ierr)
+
+       !$acc update device(temperatures_last)
+    endif
 
     ! Copy the temperatures into the current iteration temperature as well
     !$acc kernels
     DO j = 1, COLUMNS_PER_MPI_PROCESS
         DO i = 0, ROWS_PER_MPI_PROCESS - 1
+            !temperatures_last(i,j) = temperatures(i, j-1)
             temperatures(i,j) = temperatures_last(i,j)
         ENDDO
     ENDDO
