@@ -57,13 +57,10 @@ PROGRAM main
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
     integer, dimension(:), allocatable :: send_request, snapshot_request
-    integer, dimension(:), allocatable :: sendcounts, recvcounts, displs 
     integer :: ndev, idev
     
     CALL MPI_Init(ierr)
     
-    !!$acc declare create(temperature, temperature_last)
-
     ! /////////////////////////////////////////////////////
     ! ! -- PREPARATION 1: COLLECT USEFUL INFORMATION -- //
     ! /////////////////////////////////////////////////////
@@ -75,13 +72,7 @@ PROGRAM main
 
     CALL MPI_Comm_size(MPI_COMM_WORLD, comm_size, ierr)
     allocate(send_request(0:comm_size - 1), snapshot_request(0:comm_size - 1))
-    allocate(sendcounts(0:comm_size - 1), recvcounts(0:comm_size - 1), displs(0:comm_size - 1))
 
-    do i = 0, comm_size - 1
-        sendcounts(i) = ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS
-        displs(i) = (ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS + 0)*j
-    enddo
-    
     LAST_PROCESS_RANK = comm_size - 1
 
     left_neighbour_rank = merge(MPI_PROC_NULL, my_rank - 1, my_rank .EQ. FIRST_PROCESS_RANK)
