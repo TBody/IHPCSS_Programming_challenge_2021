@@ -1,3 +1,4 @@
+ Data acquisition complete.
 Iteration 0: 12.500000000000000000
 Iteration 25: 0.462081517722978674
 Iteration 50: 0.237572979390019867
@@ -57,4 +58,15 @@ Iteration 1375: 0.008792377971943210
 Iteration 1400: 0.008633416714204145
 Iteration 1425: 0.008483712443020153
 Iteration 1450: 0.008338502716821239
-The program took 30.00 seconds in total and executed 1454 iterations.
+Iteration 1475: 0.008196984353777026
+The program took 30.23 seconds in total and executed 1476 iterations.
+[1627237389.208580] [v003:28005:0]      tag_match.c:61   UCX  WARN  unexpected tag-receive descriptor 0xff507b80 was not matched
+[1627237389.208710] [v003:28005:0]          mpool.c:44   UCX  WARN  object 0xfed12dc0 was not returned to mpool ucp_requests
+[1627237389.208731] [v003:28005:0]          mpool.c:44   UCX  WARN  object 0xfed12f80 was not returned to mpool ucp_requests
+[1627237389.208733] [v003:28005:0]          mpool.c:44   UCX  WARN  object 0xfed13140 was not returned to mpool ucp_requests
+[1627237389.208734] [v003:28005:0]          mpool.c:44   UCX  WARN  object 0xfed13300 was not returned to mpool ucp_requests
+[1627237389.208736] [v003:28005:0]          mpool.c:44   UCX  WARN  object 0xfed134c0 was not returned to mpool ucp_requests
+[1627237389.208738] [v003:28005:0]          mpool.c:44   UCX  WARN  object 0xfed13680 was not returned to mpool ucp_requests
+[1627237389.208740] [v003:28005:0]          mpool.c:44   UCX  WARN  object 0xfed13840 was not returned to mpool ucp_requests
+[1627237389.208742] [v003:28005:0]          mpool.c:44   UCX  WARN  object 0xfed13a00 was not returned to mpool ucp_requests
+[1627237389.266666] [v003:28005:0]         rcache.c:519  UCX  WARN  mlx5_0: destroying inuse region 0xfecf9580 [0x1c8d9160..0x2a9d9160] g- rw ref 1 lkey 0x58be0 rkey 0x58be0 atomic_rkey 0xffffffff

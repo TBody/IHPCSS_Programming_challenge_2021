@@ -57,4 +57,14 @@ Iteration 1375: 0.008792377971943210
 Iteration 1400: 0.008633416714204145
 Iteration 1425: 0.008483712443020153
 Iteration 1450: 0.008338502716821239
-The program took 30.00 seconds in total and executed 1454 iterations.
+The program took 30.39 seconds in total and executed 1451 iterations.
+[1627243691.681872] [v003:34942:0]      tag_match.c:61   UCX  WARN  unexpected tag-receive descriptor 0x100398e00 was not matched
+[1627243691.682024] [v003:34942:0]          mpool.c:44   UCX  WARN  object 0xffba4040 was not returned to mpool ucp_requests
+[1627243691.682030] [v003:34942:0]          mpool.c:44   UCX  WARN  object 0xffba4200 was not returned to mpool ucp_requests
+[1627243691.682038] [v003:34942:0]          mpool.c:44   UCX  WARN  object 0xffba43c0 was not returned to mpool ucp_requests
+[1627243691.682041] [v003:34942:0]          mpool.c:44   UCX  WARN  object 0xffba4580 was not returned to mpool ucp_requests
+[1627243691.682044] [v003:34942:0]          mpool.c:44   UCX  WARN  object 0xffba4740 was not returned to mpool ucp_requests
+[1627243691.682047] [v003:34942:0]          mpool.c:44   UCX  WARN  object 0xffba4900 was not returned to mpool ucp_requests
+[1627243691.682051] [v003:34942:0]          mpool.c:44   UCX  WARN  object 0xffba4ac0 was not returned to mpool ucp_requests
+[1627243691.682055] [v003:34942:0]          mpool.c:44   UCX  WARN  object 0xffba4c80 was not returned to mpool ucp_requests
+[1627243691.740795] [v003:34942:0]         rcache.c:519  UCX  WARN  mlx5_0: destroying inuse region 0x1003b16a0 [0xe7b5860..0x1c8b5860] g- rw ref 1 lkey 0x680e5 rkey 0x680e5 atomic_rkey 0xffffffff

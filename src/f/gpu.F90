@@ -58,6 +58,7 @@ PROGRAM main
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
     integer, dimension(:), allocatable :: send_request, snapshot_request
     integer :: ndev, idev
+    integer :: reduce_req, gather_req
     
     CALL MPI_Init(ierr)
     
@@ -172,37 +173,18 @@ PROGRAM main
         END DO
         !$acc end kernels
 
-        ! ///////////////////////////////////
-        ! // -- SUBTASK 6: GET SNAPSHOT -- //
-        ! ///////////////////////////////////
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             call MPI_ireduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-                             MASTER_PROCESS_RANK, MPI_COMM_WORLD, snapshot_request(0), ierr)
-            
-            IF (my_rank == MASTER_PROCESS_RANK) THEN
-                
-                ! Copy locally my own temperature array in the global one
-                !$acc kernels copyout(snapshot(0:ROWS_PER_MPI_PROCESS-1, 0:COLUMNS_PER_MPI_PROCESS-1)) async(2)
-                DO k = 0, ROWS_PER_MPI_PROCESS-1
-                    DO l = 0, COLUMNS_PER_MPI_PROCESS-1
-                        snapshot(k,l) = temperatures(k + 1,l)
-                    END DO
-                END DO
-                !$acc end kernels
-                
-                DO j = 1, comm_size-1
-                     CALL MPI_Recv(snapshot(0, j * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
-                                    MPI_DOUBLE_PRECISION, j, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                ENDDO
-                !$acc wait(2)
-                CALL MPI_WAIT(snapshot_request(0), MPI_STATUS_IGNORE, ierr)
-                !CALL MPI_WAITALL(comm_size, snapshot_request, MPI_STATUSES_IGNORE, ierr)
+                             MASTER_PROCESS_RANK, MPI_COMM_WORLD, reduce_req, ierr)
+   
+            ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
+            call MPI_igather(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
+                    snapshot, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
+                    MASTER_PROCESS_RANK, MPI_COMM_WORLD, gather_req, ierr)
 
+            IF (my_rank == MASTER_PROCESS_RANK) THEN
+                CALL MPI_WAIT(reduce_req, MPI_STATUS_IGNORE, ierr)
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
-            ELSE
-                ! Send my array to the master MPI process
-                CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
-                               0, MPI_COMM_WORLD, ierr) 
             END IF
         END IF
 
