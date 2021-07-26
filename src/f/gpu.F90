@@ -56,9 +56,8 @@ PROGRAM main
     !> The last snapshot made
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
-    integer, dimension(:), allocatable :: send_request, snapshot_request
     integer :: ndev, idev
-    integer :: reduce_req, gather_req
+    integer :: reduce_req, gather_req, bcast_req
     
     CALL MPI_Init(ierr)
     
@@ -72,7 +71,6 @@ PROGRAM main
     call acc_set_device_num(idev, acc_device_nvidia)
 
     CALL MPI_Comm_size(MPI_COMM_WORLD, comm_size, ierr)
-    allocate(send_request(0:comm_size - 1), snapshot_request(0:comm_size - 1))
 
     LAST_PROCESS_RANK = comm_size - 1
 
