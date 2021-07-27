@@ -58,6 +58,7 @@ PROGRAM main
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
     integer :: ndev, idev
     integer :: reduce_req, gather_req, bcast_req
+    real(8), DIMENSION(0:ROWS_PER_MPI_PROCESS-1) :: lsend_buffer, rsend_buffer, lrecv_buffer, rrecv_buffer
     
     CALL MPI_Init(ierr)
     
@@ -137,22 +138,27 @@ PROGRAM main
 
         END IF
         
+        lsend_buffer = temperatures(:,1)
+        rsend_buffer = temperatures(:, COLUMNS_PER_MPI_PROCESS)
 
         ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, 0, MPI_COMM_WORLD, ierr)
+        CALL MPI_Ssend(lsend_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, 0, MPI_COMM_WORLD, ierr)
 
         ! Receive data from down neighbour to fill our ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
-        CALL MPI_Recv(temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
+        CALL MPI_Recv(rrecv_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
                       MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
 
         ! Send data to down neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        CALL MPI_Ssend(temperatures(0, COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, 0,&
+        CALL MPI_Ssend(rsend_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, 0,&
                        MPI_COMM_WORLD, ierr)
 
         ! Receive data from up neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
-        CALL MPI_Recv(temperatures_last(0,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, MPI_ANY_TAG, MPI_COMM_WORLD, &
+        CALL MPI_Recv(lrecv_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, MPI_ANY_TAG, MPI_COMM_WORLD, &
                       MPI_STATUS_IGNORE, ierr)
         
+        temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1) = rrecv_buffer
+        temperatures_last(:,0) = lrecv_buffer
+
         !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
 
         my_temperature_change = 0.0
