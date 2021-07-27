@@ -117,7 +117,7 @@ PROGRAM main
         ENDDO
     ENDDO
     !$acc end kernels
-    !$acc update host(temperatures(:,1), temperatures(:,COLUMNS_PER_MPI_PROCESS))
+    !$acc update host(temperatures(:,1), temperatures(:,COLUMNS_PER_MPI_PROCESS)) async(1)
 
     DO WHILE (total_time_so_far .LT. MAX_TIME)
 
@@ -140,6 +140,7 @@ PROGRAM main
 
         END IF
         
+        !$acc wait(1)
         lsend_buffer = temperatures(:,1)
         rsend_buffer = temperatures(:, COLUMNS_PER_MPI_PROCESS)
 
@@ -160,7 +161,7 @@ PROGRAM main
                        102, MPI_COMM_WORLD, lrecv_request, ierr)
         
         my_temperature_change = 0.0
-        !$acc kernels
+        !$acc kernels async(2)
         DO j = 2, COLUMNS_PER_MPI_PROCESS - 1
             ! Process the cell at the first row, which has no up neighbour
             temperatures(0,j) = (temperatures_last(0,j-1) + &
@@ -183,9 +184,9 @@ PROGRAM main
         call MPI_WAITALL(4, (/ lsend_request, rsend_request, lrecv_request, rrecv_request /), MPI_STATUSES_IGNORE, ierr)
         temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1) = rrecv_buffer
         temperatures_last(:,0) = lrecv_buffer
-        !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
+        !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1)) async(3)
 
-        !$acc kernels 
+        !$acc kernels wait(3) async(4)
         DO k = 1, 2
             j = edges(k)
             
@@ -207,7 +208,7 @@ PROGRAM main
         END DO
         !$acc end kernels
         
-        !$acc kernels
+        !$acc kernels wait(2, 4)
         temperatures = merge(temperatures, temperatures_last, temperatures_last /= MAX_TEMPERATURE)
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
@@ -216,7 +217,7 @@ PROGRAM main
             END DO
         END DO
         !$acc end kernels
-        !$acc update host(temperatures(:,1), temperatures(:,COLUMNS_PER_MPI_PROCESS))
+        !$acc update host(temperatures(:,1), temperatures(:,COLUMNS_PER_MPI_PROCESS)) async(1)
 
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             CALL MPI_WAITALL(3, (/ reduce_req, bcast_req, gather_req  /), MPI_STATUSES_IGNORE, ierr)
