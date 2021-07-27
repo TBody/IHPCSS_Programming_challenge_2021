@@ -159,7 +159,7 @@ PROGRAM main
         CALL MPI_IRecv(lrecv_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, &
                        102, MPI_COMM_WORLD, lrecv_request, ierr)
         
-        call MPI_WAITALL(4, (/ lsend_request, rsend_request, lrecv_request, rrecv_request /))
+        call MPI_WAITALL(4, (/ lsend_request, rsend_request, lrecv_request, rrecv_request /), MPI_STATUSES_IGNORE, ierr)
 
         temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1) = rrecv_buffer
         temperatures_last(:,0) = lrecv_buffer
