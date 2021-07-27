@@ -24,9 +24,13 @@ PROGRAM main
     !> Rank of the last MPI process
     INTEGER :: LAST_PROCESS_RANK
     !> Rank of my left neighbour if any
-    INTEGER :: left_neighbour_rank
+    INTEGER :: W_rank
     !> Rank of my right neighbour if any
-    INTEGER :: right_neighbour_rank
+    INTEGER :: E_rank
+    !> Rank of my top neighbour if any
+    INTEGER :: N_rank
+    !> Rank of my bottom neighbour if any
+    INTEGER :: S_rank
     !> Array that will contain my part chunk. It will include the 2 ghost rows (1 left, 1 right)
     REAL(8), DIMENSION(0:ROWS_PER_MPI_PROCESS-1,0:COLUMNS_PER_MPI_PROCESS+1) :: temperatures
     !> Temperatures from the previous iteration, same dimensions as the array above.
@@ -58,10 +62,14 @@ PROGRAM main
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
     integer :: ndev, idev
     integer :: reduce_req, gather_req, bcast_req
-    integer :: lsend_request, rsend_request, lrecv_request, rrecv_request
+    integer :: N_send_req, S_send_req, E_send_req, W_send_req
+    integer :: N_recv_req, S_recv_req, E_recv_req, W_recv_req
     integer :: cart_comm
-    integer, parameter :: XDIM = 0
-    integer, parameter :: YDIM = 1
+    !> Directions (north, south, east, west)
+    integer, parameter :: N = 11, S = 12, E = 13, W = 14
+    !> Dimensions (x and y)
+    integer, parameter :: XDIM = 0, YDIM = 1
+    !> Dimension sizes
     integer, parameter :: NX = COLUMNS/COLUMNS_PER_MPI_PROCESS
     integer, parameter :: NY = ROWS/ROWS_PER_MPI_PROCESS
     integer, dimension(0:1) :: dims, coords
@@ -88,7 +96,8 @@ PROGRAM main
     call acc_set_device_num(idev, acc_device_nvidia)
 
     call MPI_cart_coords(cart_comm, my_rank, 2, coords, ierr)
-    call MPI_CART_SHIFT(cart_comm, XDIM, +1, left_neighbour_rank, right_neighbour_rank, ierr)
+    call MPI_CART_SHIFT(cart_comm, XDIM, +1, W_rank, E_rank, ierr)
+    call MPI_CART_SHIFT(cart_comm, YDIM, +1, S_rank, N_rank, ierr)
 
     ! ////////////////////////////////////////////////////////////////////
     ! ! -- PREPARATION 2: INITIALISE TEMPERATURES ON MASTER PROCESS -- //
@@ -150,21 +159,21 @@ PROGRAM main
         END IF
         
         !$acc wait(1)
-        ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        CALL MPI_Isend(temperatures(:,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, &
-                       101, cart_comm, lsend_request, ierr)
+        ! Send data to up neighbour for its ghost cells. If my W_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
+        CALL MPI_Isend(temperatures(:,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, W_rank, &
+                       101, cart_comm, W_send_req, ierr)
 
-        ! Receive data from down neighbour to fill our ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
-        CALL MPI_IRecv(temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
-                       101, cart_comm, rrecv_request, ierr)
+        ! Receive data from down neighbour to fill our ghost cells. If my E_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
+        CALL MPI_IRecv(temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, E_rank, &
+                       101, cart_comm, E_recv_req, ierr)
 
-        ! Send data to down neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        CALL MPI_Isend(temperatures(:, COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
-                       102, cart_comm, rsend_request, ierr)
+        ! Send data to down neighbour for its ghost cells. If my E_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
+        CALL MPI_Isend(temperatures(:, COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, E_rank, &
+                       102, cart_comm, E_send_req, ierr)
 
-        ! Receive data from up neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
-        CALL MPI_IRecv(temperatures_last(:,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, &
-                       102, cart_comm, lrecv_request, ierr)
+        ! Receive data from up neighbour to fill our ghost cells. If my W_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
+        CALL MPI_IRecv(temperatures_last(:,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, W_rank, &
+                       102, cart_comm, W_recv_req, ierr)
         
         my_temperature_change = 0.0
         !$acc kernels async(2)
@@ -189,7 +198,7 @@ PROGRAM main
         ENDDO
         !$acc end kernels 
 
-        call MPI_WAITALL(4, (/ lsend_request, rsend_request, lrecv_request, rrecv_request /), MPI_STATUSES_IGNORE, ierr)
+        call MPI_WAITALL(4, (/ W_send_req, E_send_req, W_recv_req, E_recv_req /), MPI_STATUSES_IGNORE, ierr)
         !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
         !$acc kernels async(3)
         DO i = 1, ROWS_PER_MPI_PROCESS - 2
