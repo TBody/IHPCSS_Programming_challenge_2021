@@ -60,6 +60,7 @@ PROGRAM main
     integer :: reduce_req, gather_req, bcast_req
     real(8), DIMENSION(0:ROWS_PER_MPI_PROCESS-1) :: lsend_buffer, rsend_buffer, lrecv_buffer, rrecv_buffer
     integer :: lsend_request, rsend_request, lrecv_request, rrecv_request
+    integer, dimension(2), parameter :: edges = (/ 1, COLUMNS_PER_MPI_PROCESS /)
     
     CALL MPI_Init(ierr)
     
@@ -77,7 +78,6 @@ PROGRAM main
     LAST_PROCESS_RANK = comm_size - 1
 
     left_neighbour_rank = merge(MPI_PROC_NULL, my_rank - 1, my_rank .EQ. FIRST_PROCESS_RANK)
-    
     right_neighbour_rank = merge(MPI_PROC_NULL, my_rank + 1, my_rank .EQ. LAST_PROCESS_RANK)
 
     ! ////////////////////////////////////////////////////////////////////
@@ -168,11 +168,11 @@ PROGRAM main
 
         my_temperature_change = 0.0
         !$acc kernels
-        DO j = 1, COLUMNS_PER_MPI_PROCESS 
+        DO j = 2, COLUMNS_PER_MPI_PROCESS - 1
             ! Process the cell at the first row, which has no up neighbour
-                temperatures(0,j) = (temperatures_last(0,j-1) + &
-                                     temperatures_last(0,j+1) + &
-                                     temperatures_last(1,j  )) * one_third 
+            temperatures(0,j) = (temperatures_last(0,j-1) + &
+                                 temperatures_last(0,j+1) + &
+                                 temperatures_last(1,j  )) * one_third 
             ! Process all cells between the first and last columns excluded, which each has both left and right neighbours
             DO i = 1, ROWS_PER_MPI_PROCESS - 2
                     temperatures(i,j) = 0.25 * (temperatures_last(i-1,j  ) + &
@@ -181,10 +181,35 @@ PROGRAM main
                                                 temperatures_last(i  ,j+1))
             END DO
             ! Process the cell at the bottom row, which has no down neighbour
-                temperatures(ROWS_PER_MPI_PROCESS-1,j) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, j - 1) + &
-                                                          temperatures_last(ROWS_PER_MPI_PROCESS-1, j + 1) + &
-                                                          temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) * one_third
+            temperatures(ROWS_PER_MPI_PROCESS-1,j) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, j - 1) + &
+                                                      temperatures_last(ROWS_PER_MPI_PROCESS-1, j + 1) + &
+                                                      temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) * one_third
         END DO
+        !$acc end kernels
+
+        !$acc kernels
+        DO k = 1, 2
+            j = edges(k)
+            
+            ! Process the cell at the first row, which has no up neighbour
+            temperatures(0,j) = (temperatures_last(0,j-1) + &
+                                 temperatures_last(0,j+1) + &
+                                 temperatures_last(1,j  )) * one_third 
+            ! Process all cells between the first and last columns excluded, which each has both left and right neighbours
+            DO i = 1, ROWS_PER_MPI_PROCESS - 2
+                    temperatures(i,j) = 0.25 * (temperatures_last(i-1,j  ) + &
+                                                temperatures_last(i+1,j  ) + &
+                                                temperatures_last(i  ,j-1) + &
+                                                temperatures_last(i  ,j+1))
+            END DO
+            ! Process the cell at the bottom row, which has no down neighbour
+            temperatures(ROWS_PER_MPI_PROCESS-1,j) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, j - 1) + &
+                                                      temperatures_last(ROWS_PER_MPI_PROCESS-1, j + 1) + &
+                                                      temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) * one_third
+        END DO
+        !$acc end kernels
+        
+        !$acc kernels
         temperatures = merge(temperatures, temperatures_last, temperatures_last /= MAX_TEMPERATURE)
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
