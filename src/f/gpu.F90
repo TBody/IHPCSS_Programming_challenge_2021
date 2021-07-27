@@ -59,6 +59,7 @@ PROGRAM main
     integer :: ndev, idev
     integer :: reduce_req, gather_req, bcast_req
     real(8), DIMENSION(0:ROWS_PER_MPI_PROCESS-1) :: lsend_buffer, rsend_buffer, lrecv_buffer, rrecv_buffer
+    integer :: lsend_request, rsend_request, lrecv_request, rrecv_request
     
     CALL MPI_Init(ierr)
     
@@ -143,20 +144,23 @@ PROGRAM main
         rsend_buffer = temperatures(:, COLUMNS_PER_MPI_PROCESS)
 
         ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        CALL MPI_Ssend(lsend_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, 0, MPI_COMM_WORLD, ierr)
+        CALL MPI_Isend(lsend_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, &
+                       101, MPI_COMM_WORLD, lsend_request, ierr)
 
         ! Receive data from down neighbour to fill our ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
-        CALL MPI_Recv(rrecv_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
-                      MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+        CALL MPI_IRecv(rrecv_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
+                       101, MPI_COMM_WORLD, rrecv_request, ierr)
 
         ! Send data to down neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        CALL MPI_Ssend(rsend_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, 0,&
-                       MPI_COMM_WORLD, ierr)
+        CALL MPI_Isend(rsend_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
+                       102, MPI_COMM_WORLD, rsend_request, ierr)
 
         ! Receive data from up neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
-        CALL MPI_Recv(lrecv_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, MPI_ANY_TAG, MPI_COMM_WORLD, &
-                      MPI_STATUS_IGNORE, ierr)
+        CALL MPI_IRecv(lrecv_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, &
+                       102, MPI_COMM_WORLD, lrecv_request, ierr)
         
+        call MPI_WAITALL(4, (/ lsend_request, rsend_request, lrecv_request, rrecv_request /))
+
         temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1) = rrecv_buffer
         temperatures_last(:,0) = lrecv_buffer
 
