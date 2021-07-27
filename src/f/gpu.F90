@@ -159,13 +159,6 @@ PROGRAM main
         CALL MPI_IRecv(lrecv_buffer, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, &
                        102, MPI_COMM_WORLD, lrecv_request, ierr)
         
-        call MPI_WAITALL(4, (/ lsend_request, rsend_request, lrecv_request, rrecv_request /), MPI_STATUSES_IGNORE, ierr)
-
-        temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1) = rrecv_buffer
-        temperatures_last(:,0) = lrecv_buffer
-
-        !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
-
         my_temperature_change = 0.0
         !$acc kernels
         DO j = 2, COLUMNS_PER_MPI_PROCESS - 1
@@ -187,7 +180,12 @@ PROGRAM main
         END DO
         !$acc end kernels
 
-        !$acc kernels
+        call MPI_WAITALL(4, (/ lsend_request, rsend_request, lrecv_request, rrecv_request /), MPI_STATUSES_IGNORE, ierr)
+        temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1) = rrecv_buffer
+        temperatures_last(:,0) = lrecv_buffer
+        !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
+
+        !$acc kernels 
         DO k = 1, 2
             j = edges(k)
             
