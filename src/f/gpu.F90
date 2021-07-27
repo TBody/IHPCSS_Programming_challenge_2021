@@ -59,33 +59,36 @@ PROGRAM main
     integer :: ndev, idev
     integer :: reduce_req, gather_req, bcast_req
     integer :: lsend_request, rsend_request, lrecv_request, rrecv_request
-    integer :: cart_comm, coords
-    integer, parameter :: ROW_DIM = 0
-    integer, parameter :: COL_DIM = 1
-    integer, dimension(0:1) :: dims
+    integer :: cart_comm
+    integer, parameter :: XDIM = 0
+    integer, parameter :: YDIM = 1
+    integer, parameter :: NX = COLUMNS/COLUMNS_PER_MPI_PROCESS
+    integer, parameter :: NY = ROWS/ROWS_PER_MPI_PROCESS
+    integer, dimension(0:1) :: dims, coords
 
     CALL MPI_Init(ierr)
     
     ! /////////////////////////////////////////////////////
     ! ! -- PREPARATION 1: COLLECT USEFUL INFORMATION -- //
     ! /////////////////////////////////////////////////////
-    dims = (/ ROWS / ROWS_PER_MPI_PROCESS, COLUMNS / COLUMNS_PER_MPI_PROCESS /)
+    dims = (/ NX, NY /)
+    CALL MPI_Comm_size(MPI_COMM_WORLD, comm_size, ierr)
     
-    CALL MPI_cart_create(MPI_COMM_WORLD, 2, &
-                         dims, &
+    if (.not.(dims(0) * dims(1) == comm_size)) then
+        print *, "Error: could not decompose MPI with given ROWS_PER_MPI_PROCESS and COLUMNS_PER_MPI_PROCESS", NX, NY, comm_size
+    endif
+
+    CALL MPI_cart_create(MPI_COMM_WORLD, 2, dims, &
                          (/ .false., .false./), .false., cart_comm, ierr)
 
-    CALL MPI_Comm_size(cart_comm, comm_size, ierr)
     CALL MPI_Comm_rank(cart_comm, my_rank, ierr)
     
     ndev = acc_get_num_devices(acc_device_nvidia)
     idev = mod(my_rank, ndev)
     call acc_set_device_num(idev, acc_device_nvidia)
 
-    call MPI_cart_coords(cart_comm, my_rank, 2, coords)
-
-    MPI_CART_SHIFT(cart_comm, ROW_DIM, +1, my_rank, right_neighbour_rank)
-    MPI_CART_SHIFT(cart_comm, ROW_DIM, -1, my_rank, left_neighbour_rank)
+    call MPI_cart_coords(cart_comm, my_rank, 2, coords, ierr)
+    call MPI_CART_SHIFT(cart_comm, XDIM, +1, left_neighbour_rank, right_neighbour_rank, ierr)
 
     ! ////////////////////////////////////////////////////////////////////
     ! ! -- PREPARATION 2: INITIALISE TEMPERATURES ON MASTER PROCESS -- //
@@ -95,7 +98,6 @@ PROGRAM main
     IF (my_rank == MASTER_PROCESS_RANK) THEN
         CALL initialise_temperatures(all_temperatures)
     END IF
-
 
     CALL MPI_Barrier(cart_comm, ierr)
     ! ///////////////////////////////////////////
