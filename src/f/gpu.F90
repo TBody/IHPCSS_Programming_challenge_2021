@@ -193,7 +193,9 @@ PROGRAM main
             CALL MPI_WAIT(bcast_req, MPI_STATUS_IGNORE, ierr)
         END IF
 
-        ! Update the iteration number
+        ! Update the iteration number (This seems like cheating: we calculated the total time at the start of the step,
+        ! so we could get an iteration for free. But to adjust for that (and still have the right output), the inital value
+        ! of iteration_count was set to -1)
         iteration_count = iteration_count + 1
     END DO
     !$acc end data
