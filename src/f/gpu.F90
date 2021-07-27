@@ -59,24 +59,33 @@ PROGRAM main
     integer :: ndev, idev
     integer :: reduce_req, gather_req, bcast_req
     integer :: lsend_request, rsend_request, lrecv_request, rrecv_request
-    
+    integer :: cart_comm, coords
+    integer, parameter :: ROW_DIM = 0
+    integer, parameter :: COL_DIM = 1
+    integer, dimension(0:1) :: dims
+
     CALL MPI_Init(ierr)
     
     ! /////////////////////////////////////////////////////
     ! ! -- PREPARATION 1: COLLECT USEFUL INFORMATION -- //
     ! /////////////////////////////////////////////////////
-    CALL MPI_Comm_rank(MPI_COMM_WORLD, my_rank, ierr)
+    dims = (/ ROWS / ROWS_PER_MPI_PROCESS, COLUMNS / COLUMNS_PER_MPI_PROCESS /)
+    
+    CALL MPI_cart_create(MPI_COMM_WORLD, 2, &
+                         dims, &
+                         (/ .false., .false./), .false., cart_comm, ierr)
+
+    CALL MPI_Comm_size(cart_comm, comm_size, ierr)
+    CALL MPI_Comm_rank(cart_comm, my_rank, ierr)
     
     ndev = acc_get_num_devices(acc_device_nvidia)
     idev = mod(my_rank, ndev)
     call acc_set_device_num(idev, acc_device_nvidia)
 
-    CALL MPI_Comm_size(MPI_COMM_WORLD, comm_size, ierr)
+    call MPI_cart_coords(cart_comm, my_rank, 2, coords)
 
-    LAST_PROCESS_RANK = comm_size - 1
-
-    left_neighbour_rank = merge(MPI_PROC_NULL, my_rank - 1, my_rank .EQ. FIRST_PROCESS_RANK)
-    right_neighbour_rank = merge(MPI_PROC_NULL, my_rank + 1, my_rank .EQ. LAST_PROCESS_RANK)
+    MPI_CART_SHIFT(cart_comm, ROW_DIM, +1, my_rank, right_neighbour_rank)
+    MPI_CART_SHIFT(cart_comm, ROW_DIM, -1, my_rank, left_neighbour_rank)
 
     ! ////////////////////////////////////////////////////////////////////
     ! ! -- PREPARATION 2: INITIALISE TEMPERATURES ON MASTER PROCESS -- //
@@ -88,7 +97,7 @@ PROGRAM main
     END IF
 
 
-    CALL MPI_Barrier(MPI_COMM_WORLD, ierr)
+    CALL MPI_Barrier(cart_comm, ierr)
     ! ///////////////////////////////////////////
     ! !     ^                                 //
     ! !    / \                                //
@@ -104,7 +113,7 @@ PROGRAM main
 
     CALL MPI_scatter(all_temperatures, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
                      temperatures_last(0, 1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
-                     MPI_COMM_WORLD, ierr)
+                     cart_comm, ierr)
     
     ! Copy the temperatures into the current iteration temperature as well
     !$acc data create(temperatures) copyin(temperatures_last)
@@ -125,35 +134,35 @@ PROGRAM main
         END IF
 
         ! Send total timer to everybody so they too can exit the loop if more than the allowed runtime has elapsed already
-        CALL MPI_IBcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, MPI_COMM_WORLD, bcast_req, ierr)
+        CALL MPI_IBcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, cart_comm, bcast_req, ierr)
 
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             call MPI_ireduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-                             MASTER_PROCESS_RANK, MPI_COMM_WORLD, reduce_req, ierr)
+                             MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
    
             ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
             call MPI_igather(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
                     snapshot, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
-                    MASTER_PROCESS_RANK, MPI_COMM_WORLD, gather_req, ierr)
+                    MASTER_PROCESS_RANK, cart_comm, gather_req, ierr)
 
         END IF
         
         !$acc wait(1)
         ! Send data to up neighbour for its ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
         CALL MPI_Isend(temperatures(:,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, &
-                       101, MPI_COMM_WORLD, lsend_request, ierr)
+                       101, cart_comm, lsend_request, ierr)
 
         ! Receive data from down neighbour to fill our ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
         CALL MPI_IRecv(temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
-                       101, MPI_COMM_WORLD, rrecv_request, ierr)
+                       101, cart_comm, rrecv_request, ierr)
 
         ! Send data to down neighbour for its ghost cells. If my right_neighbour_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
         CALL MPI_Isend(temperatures(:, COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, right_neighbour_rank, &
-                       102, MPI_COMM_WORLD, rsend_request, ierr)
+                       102, cart_comm, rsend_request, ierr)
 
         ! Receive data from up neighbour to fill our ghost cells. If my left_neighbour_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
         CALL MPI_IRecv(temperatures_last(:,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, left_neighbour_rank, &
-                       102, MPI_COMM_WORLD, lrecv_request, ierr)
+                       102, cart_comm, lrecv_request, ierr)
         
         my_temperature_change = 0.0
         !$acc kernels async(2)
