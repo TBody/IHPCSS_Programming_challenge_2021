@@ -59,7 +59,6 @@ PROGRAM main
     integer :: ndev, idev
     integer :: reduce_req, gather_req, bcast_req
     integer :: lsend_request, rsend_request, lrecv_request, rrecv_request
-    integer, dimension(2), parameter :: edges = (/ 1, COLUMNS_PER_MPI_PROCESS /)
     
     CALL MPI_Init(ierr)
     
@@ -180,25 +179,17 @@ PROGRAM main
         call MPI_WAITALL(4, (/ lsend_request, rsend_request, lrecv_request, rrecv_request /), MPI_STATUSES_IGNORE, ierr)
         !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
         !$acc kernels async(3)
-        DO k = 1, 2
-            j = edges(k)
-            
-            ! Process the cell at the first row, which has no up neighbour
-            temperatures(0,j) = (temperatures_last(0,j-1) + &
-                                 temperatures_last(0,j+1) + &
-                                 temperatures_last(1,j  )) * one_third 
-            ! Process all cells between the first and last columns excluded, which each has both left and right neighbours
-            DO i = 1, ROWS_PER_MPI_PROCESS - 2
-                    temperatures(i,j) = 0.25 * (temperatures_last(i-1,j  ) + &
-                                                temperatures_last(i+1,j  ) + &
-                                                temperatures_last(i  ,j-1) + &
-                                                temperatures_last(i  ,j+1))
-            END DO
-            ! Process the cell at the bottom row, which has no down neighbour
-            temperatures(ROWS_PER_MPI_PROCESS-1,j) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, j - 1) + &
-                                                      temperatures_last(ROWS_PER_MPI_PROCESS-1, j + 1) + &
-                                                      temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) * one_third
+        temperatures(0,1) = (temperatures_last(0,1-1) + temperatures_last(0,1+1) + temperatures_last(1,1)) * one_third 
+        DO i = 1, ROWS_PER_MPI_PROCESS - 2
+            temperatures(i,1) = 0.25 * (temperatures_last(i-1,1) + temperatures_last(i+1,1) + temperatures_last(i,1-1) + temperatures_last(i,1+1))
         END DO
+        temperatures(ROWS_PER_MPI_PROCESS-1,1) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, 1 - 1) + temperatures_last(ROWS_PER_MPI_PROCESS-1, 1 + 1) + temperatures_last(ROWS_PER_MPI_PROCESS-2, 1)) * one_third
+        
+        temperatures(0,COLUMNS_PER_MPI_PROCESS) = (temperatures_last(0,COLUMNS_PER_MPI_PROCESS-1) + temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1) + temperatures_last(1,COLUMNS_PER_MPI_PROCESS)) * one_third 
+        DO i = 1, ROWS_PER_MPI_PROCESS - 2
+            temperatures(i,COLUMNS_PER_MPI_PROCESS) = 0.25 * (temperatures_last(i-1,COLUMNS_PER_MPI_PROCESS) + temperatures_last(i+1,COLUMNS_PER_MPI_PROCESS) + temperatures_last(i,COLUMNS_PER_MPI_PROCESS-1) + temperatures_last(i,COLUMNS_PER_MPI_PROCESS+1))
+        END DO
+        temperatures(ROWS_PER_MPI_PROCESS-1,COLUMNS_PER_MPI_PROCESS) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, COLUMNS_PER_MPI_PROCESS - 1) + temperatures_last(ROWS_PER_MPI_PROCESS-1, COLUMNS_PER_MPI_PROCESS + 1) + temperatures_last(ROWS_PER_MPI_PROCESS-2, COLUMNS_PER_MPI_PROCESS)) * one_third
         !$acc end kernels
         
         !$acc kernels wait(2, 3)
