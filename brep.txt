@@ -59,4 +59,5 @@ Iteration 1425: 0.008483712443020153
 Iteration 1450: 0.008338502716821239
 Iteration 1475: 0.008196984353777026
 Iteration 1500: 0.008059052919691112
-The program took 30.21 seconds in total and executed 1502 iterations.
+Iteration 1525: 0.007927249658013835
+The program took 30.20 seconds in total and executed 1527 iterations.
