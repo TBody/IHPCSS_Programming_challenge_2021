@@ -116,6 +116,7 @@ PROGRAM main
         ENDDO
     ENDDO
     !$acc end kernels
+    !$acc update host(temperatures(:,1), temperatures(:,COLUMNS_PER_MPI_PROCESS))
 
     DO WHILE (total_time_so_far .LT. MAX_TIME)
 
