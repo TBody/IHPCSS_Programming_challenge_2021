@@ -156,8 +156,7 @@ PROGRAM main
                        102, MPI_COMM_WORLD, lrecv_request, ierr)
         
         my_temperature_change = 0.0
-        !$acc parallel async(2)
-        !$acc loop collapse(2) independent
+        !$acc kernels async(2)
         DO j = 2, COLUMNS_PER_MPI_PROCESS - 1
             ! Process all cells between the first and last columns excluded, which each has both left and right neighbours
             DO i = 1, ROWS_PER_MPI_PROCESS - 2
@@ -167,7 +166,6 @@ PROGRAM main
                                                 temperatures_last(i  ,j+1))
             END DO
         END DO
-        !$acc loop independent
         DO j = 2, COLUMNS_PER_MPI_PROCESS - 1
             ! Process the cell at the first row, which has no up neighbour
             temperatures(0,j) = (temperatures_last(0,j-1) + &
@@ -178,12 +176,11 @@ PROGRAM main
                                  temperatures_last(ROWS_PER_MPI_PROCESS-1, j + 1) + &
                                  temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) * one_third
         ENDDO
-        !$acc end parallel
+        !$acc end kernels 
 
         call MPI_WAITALL(4, (/ lsend_request, rsend_request, lrecv_request, rrecv_request /), MPI_STATUSES_IGNORE, ierr)
         !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
-        !$acc parallel async(3)
-        !$acc loop independent
+        !$acc kernels async(3)
         DO i = 1, ROWS_PER_MPI_PROCESS - 2
             temperatures(i,1) = 0.25 * (temperatures_last(i-1,1) + temperatures_last(i+1,1) &
                                       + temperatures_last(i,1-1) + temperatures_last(i,1+1))
@@ -192,7 +189,6 @@ PROGRAM main
                                                             + temperatures_last(i,COLUMNS_PER_MPI_PROCESS-1) &
                                                             + temperatures_last(i,COLUMNS_PER_MPI_PROCESS+1))
         END DO
-        !$acc end loop
         
         temperatures(0,1) = (temperatures_last(0,1-1) + temperatures_last(0,1+1) &
                            + temperatures_last(1,1)) * one_third 
@@ -207,7 +203,7 @@ PROGRAM main
                 + temperatures_last(ROWS_PER_MPI_PROCESS-1, COLUMNS_PER_MPI_PROCESS + 1) &
                 + temperatures_last(ROWS_PER_MPI_PROCESS-2, COLUMNS_PER_MPI_PROCESS)) * one_third
         
-        !$acc end parallel
+        !$acc end kernels 
         
         !$acc kernels wait(2, 3)
         temperatures = merge(temperatures, temperatures_last, temperatures_last /= MAX_TEMPERATURE)
