@@ -73,7 +73,7 @@ PROGRAM main
     integer, parameter :: NX = COLUMNS/COLUMNS_PER_MPI_PROCESS
     integer, parameter :: NY = ROWS/ROWS_PER_MPI_PROCESS
     integer, dimension(0:1) :: dims, coords
-
+    logical, parameter :: check_snapshot
     CALL MPI_Init(ierr)
     
     ! /////////////////////////////////////////////////////
@@ -245,6 +245,9 @@ PROGRAM main
             CALL MPI_WAITALL(3, (/ reduce_req, bcast_req, gather_req  /), MPI_STATUSES_IGNORE, ierr)
             if (my_rank == MASTER_PROCESS_RANK) then
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
+                if (check_snapshot) then
+                    WRITE(*,'(A,5E14.7)') 'sum snapshot: ', sum(snapshot)
+                endif
             endif
         else
             CALL MPI_WAIT(bcast_req, MPI_STATUS_IGNORE, ierr)
