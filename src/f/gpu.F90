@@ -196,7 +196,8 @@ PROGRAM main
             temperatures_last(:,2:COLS_MPI-1) /= MAX_TEMPERATURE)
         !$acc end kernels
         IF (MOD(iteration_count+1, SNAPSHOT_INTERVAL) .EQ. 0) THEN
-            !$acc update temperatures(:,2:COLS_MPI-1) async(4)
+            !$acc update host(temperatures(:,2:COLS_MPI-1)) async(4)
+            continue
         ENDIF
 
         call MPI_WAITALL(4, (/ W_send_req, E_send_req, W_recv_req, E_recv_req /), MPI_STATUSES_IGNORE, ierr)

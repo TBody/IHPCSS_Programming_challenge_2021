@@ -52,5 +52,4 @@ Iteration 1250: 0.009671733596174903
 Iteration 1275: 0.009481207422346927
 Iteration 1300: 0.009296573239588213
 Iteration 1325: 0.009123814594001800
-Iteration 1350: 0.008955797020171019
-The program took 30.29 seconds in total and executed 1352 iterations.
+The program took 30.00 seconds in total and executed 1327 iterations.
