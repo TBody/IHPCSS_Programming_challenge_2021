@@ -58,7 +58,7 @@ PROGRAM main
     !> Used to store temperatures changes from other MPI processes
     REAL(8) :: subtotal
     !> The last snapshot made
-    REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
+    REAL(8), DIMENSION(1:ROWS,1:COLUMNS) :: snapshot
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
     integer :: ndev, idev
     integer :: reduce_req, gather_req, bcast_req
@@ -73,7 +73,7 @@ PROGRAM main
     integer, parameter :: NX = COLUMNS/COLUMNS_PER_MPI_PROCESS
     integer, parameter :: NY = ROWS/ROWS_PER_MPI_PROCESS
     integer, dimension(0:1) :: dims, coords
-    logical, parameter :: check_snapshot = .true.
+    logical, parameter :: check_snapshot = .false.
     CALL MPI_Init(ierr)
     
     ! /////////////////////////////////////////////////////
@@ -251,34 +251,6 @@ PROGRAM main
             endif
         else
             CALL MPI_WAIT(bcast_req, MPI_STATUS_IGNORE, ierr)
-        END IF
-
-        IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
-            !$acc update host(temperatures)
-            IF (my_rank == MASTER_PROCESS_RANK) THEN
-                DO j = 0, comm_size-1
-                    IF (j .EQ. my_rank) THEN
-                        ! Copy locally my own temperature array in the global one
-                        DO k = 0, ROWS_PER_MPI_PROCESS-1
-                            DO l = 0, COLUMNS_PER_MPI_PROCESS-1
-                                snapshot(j * ROWS_PER_MPI_PROCESS + k,l) = temperatures(k + 1,l)
-                            END DO
-                        END DO
-                    ELSE
-                        CALL MPI_Recv(snapshot(0, j * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
-                                      MPI_DOUBLE_PRECISION, j, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    END IF
-                END DO
-
-                WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
-                if (check_snapshot) then
-                    WRITE(*,'(A,I0,A,5E14.7)'), 'Iteration ', iteration_count, ': sum snapshot: ', sum(snapshot)
-                endif
-            ELSE
-                ! Send my array to the master MPI process
-                CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
-                               0, MPI_COMM_WORLD, ierr) 
-            END IF
         END IF
 
         ! Update the iteration number (This seems like cheating: we calculated the total time at the start of the step,
