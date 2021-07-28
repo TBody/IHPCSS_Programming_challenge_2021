@@ -1,0 +1,38 @@
+    110, Generating copyin(temperatures_last(:,:)) [if not already present]
+         Generating create(temperatures(:,:)) [if not already present]
+    112, Loop is parallelizable
+    113, Loop is parallelizable
+         Generating Tesla code
+        112, !$acc loop gang, vector(128) collapse(2) ! blockidx%x threadidx%x
+        113,   ! blockidx%x threadidx%x auto-collapsed
+    118, Generating update self(temperatures(:,1),temperatures(:,1920))
+    160, Loop is parallelizable
+         Generating Tesla code
+        160, !$acc loop gang ! blockidx%x
+        166, !$acc loop vector(128) ! threadidx%x
+    166, Loop is parallelizable
+    180, Generating update device(temperatures_last(:,1921),temperatures_last(:,:0))
+    181, Accelerator serial kernel generated
+         Generating Tesla code
+    183, Loop is parallelizable
+         Generating Tesla code
+        183, !$acc loop gang, vector(128) ! blockidx%x threadidx%x
+    186, Accelerator serial kernel generated
+         Generating Tesla code
+    189, Loop is parallelizable
+         Generating Tesla code
+        189, !$acc loop gang, vector(128) ! blockidx%x threadidx%x
+    192, Accelerator serial kernel generated
+         Generating Tesla code
+    195, Generating implicit copy(my_temperature_change) [if not already present]
+    196, Loop is parallelizable
+         Generating Tesla code
+        196,   ! blockidx%x threadidx%x auto-collapsed
+             !$acc loop gang, vector(128) collapse(2) ! blockidx%x threadidx%x
+    197, Loop is parallelizable
+    198, Loop is parallelizable
+         Generating Tesla code
+        197, !$acc loop gang, vector(128) collapse(2) ! blockidx%x threadidx%x
+             Generating implicit reduction(max:my_temperature_change)
+        198,   ! blockidx%x threadidx%x auto-collapsed
+    204, Generating update self(temperatures(:,1920),temperatures(:,1))
