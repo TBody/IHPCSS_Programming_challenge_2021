@@ -1,66 +1,81 @@
 Iteration 0: 12.500000000000000000
+Iteration          0: sum snapshot:  0.2950272E+10
 Iteration 25: 0.462081517722978674
+Iteration         25: sum snapshot:  0.2953603E+10
 Iteration 50: 0.237572979390019867
+Iteration         50: sum snapshot:  0.2955356E+10
 Iteration 75: 0.159232105679329550
+Iteration         75: sum snapshot:  0.2956714E+10
 Iteration 100: 0.119853118823609606
+Iteration        100: sum snapshot:  0.2957865E+10
 Iteration 125: 0.096079500037223653
+Iteration        125: sum snapshot:  0.2958880E+10
 Iteration 150: 0.080071814820882992
+Iteration        150: sum snapshot:  0.2959800E+10
 Iteration 175: 0.068654064312315910
+Iteration        175: sum snapshot:  0.2960647E+10
 Iteration 200: 0.060216016497202318
+Iteration        200: sum snapshot:  0.2961435E+10
 Iteration 225: 0.053491745726695683
+Iteration        225: sum snapshot:  0.2962176E+10
 Iteration 250: 0.048200288303846150
+Iteration        250: sum snapshot:  0.2962878E+10
 Iteration 275: 0.043829499308529307
+Iteration        275: sum snapshot:  0.2963545E+10
 Iteration 300: 0.040185315032005064
+Iteration        300: sum snapshot:  0.2964183E+10
 Iteration 325: 0.037109971966104993
+Iteration        325: sum snapshot:  0.2964795E+10
 Iteration 350: 0.034464207032947058
+Iteration        350: sum snapshot:  0.2965384E+10
 Iteration 375: 0.032170518282873317
+Iteration        375: sum snapshot:  0.2965952E+10
 Iteration 400: 0.030173037409234382
+Iteration        400: sum snapshot:  0.2966502E+10
 Iteration 425: 0.028384769132077992
+Iteration        425: sum snapshot:  0.2967035E+10
 Iteration 450: 0.026830921017218401
+Iteration        450: sum snapshot:  0.2967553E+10
 Iteration 475: 0.025401373231119351
+Iteration        475: sum snapshot:  0.2968056E+10
 Iteration 500: 0.024150095906183111
+Iteration        500: sum snapshot:  0.2968547E+10
 Iteration 525: 0.023000318443241241
+Iteration        525: sum snapshot:  0.2969025E+10
 Iteration 550: 0.021948292626987609
+Iteration        550: sum snapshot:  0.2969493E+10
 Iteration 575: 0.021007398292130830
+Iteration        575: sum snapshot:  0.2969950E+10
 Iteration 600: 0.020125686211482474
+Iteration        600: sum snapshot:  0.2970397E+10
 Iteration 625: 0.019323654741112861
+Iteration        625: sum snapshot:  0.2970834E+10
 Iteration 650: 0.018586797958128898
+Iteration        650: sum snapshot:  0.2971264E+10
 Iteration 675: 0.017891369318576267
+Iteration        675: sum snapshot:  0.2971685E+10
 Iteration 700: 0.017257343736234887
+Iteration        700: sum snapshot:  0.2972098E+10
 Iteration 725: 0.016666414412913610
+Iteration        725: sum snapshot:  0.2972504E+10
 Iteration 750: 0.016105385043164944
+Iteration        750: sum snapshot:  0.2972903E+10
 Iteration 775: 0.015589020450915925
+Iteration        775: sum snapshot:  0.2973296E+10
 Iteration 800: 0.015105850897235484
+Iteration        800: sum snapshot:  0.2973682E+10
 Iteration 825: 0.014644815713118930
+Iteration        825: sum snapshot:  0.2974063E+10
 Iteration 850: 0.014213733914200333
+Iteration        850: sum snapshot:  0.2974437E+10
 Iteration 875: 0.013812284504510330
+Iteration        875: sum snapshot:  0.2974807E+10
 Iteration 900: 0.013427572807891863
+Iteration        900: sum snapshot:  0.2975171E+10
 Iteration 925: 0.013060132741742336
+Iteration        925: sum snapshot:  0.2975530E+10
 Iteration 950: 0.012722059496940830
+Iteration        950: sum snapshot:  0.2975884E+10
 Iteration 975: 0.012396872524508495
-Iteration 1000: 0.012084030995808348
-Iteration 1025: 0.011790153078624854
-Iteration 1050: 0.011512249668522045
-Iteration 1075: 0.011244038515741295
-Iteration 1100: 0.010985143277771670
-Iteration 1125: 0.010744124525199794
-Iteration 1150: 0.010512086164226275
-Iteration 1175: 0.010287483828559374
-Iteration 1200: 0.010070393045509718
-Iteration 1225: 0.009868063801187432
-Iteration 1250: 0.009671733596174903
-Iteration 1275: 0.009481207422346927
-Iteration 1300: 0.009296573239588213
-Iteration 1325: 0.009123814594001800
-Iteration 1350: 0.008955797020171019
-Iteration 1375: 0.008792377971943210
-Iteration 1400: 0.008633416714204145
-Iteration 1425: 0.008483712443020153
-Iteration 1450: 0.008338502716821239
-Iteration 1475: 0.008196984353777026
-Iteration 1500: 0.008059052919691112
-Iteration 1525: 0.007927249658013835
-Iteration 1550: 0.007800670276857602
-Iteration 1575: 0.007677088274151700
-Iteration 1600: 0.007556425216186824
-The program took 30.29 seconds in total and executed 1602 iterations.
+Iteration        975: sum snapshot:  0.2976234E+10
+The program took 30.30 seconds in total and executed 977 iterations.
