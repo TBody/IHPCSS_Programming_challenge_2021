@@ -73,7 +73,7 @@ PROGRAM main
     integer, parameter :: NX = COLUMNS/COLUMNS_PER_MPI_PROCESS
     integer, parameter :: NY = ROWS/ROWS_PER_MPI_PROCESS
     integer, dimension(0:1) :: dims, coords
-    logical, parameter :: check_snapshot
+    logical, parameter :: check_snapshot = .true.
     CALL MPI_Init(ierr)
     
     ! /////////////////////////////////////////////////////
@@ -246,7 +246,7 @@ PROGRAM main
             if (my_rank == MASTER_PROCESS_RANK) then
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
                 if (check_snapshot) then
-                    WRITE(*,'(A,5E14.7)') 'sum snapshot: ', sum(snapshot)
+                    WRITE(*,'(A,I10,A,5E14.7)') 'Iteration ', iteration_count, ': sum snapshot: ', sum(snapshot)
                 endif
             endif
         else
