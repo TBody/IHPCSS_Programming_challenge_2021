@@ -150,7 +150,8 @@ PROGRAM main
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             call MPI_ireduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
                              MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
-   
+            
+            !$acc update host(temperatures(1:ROWS_PER_MPI_PROCESS, 1:COLUMNS_PER_MPI_PROCESS))
             ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
             call MPI_igather(temperatures(1,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
                     snapshot, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
@@ -196,7 +197,7 @@ PROGRAM main
                                                     temperatures_last(ROWS_PER_MPI_PROCESS, j + 1) + &
                                                     temperatures_last(ROWS_PER_MPI_PROCESS  -1, j)) * one_third
         ENDDO
-        !$acc end kernels 
+        !$acc end kernels
 
         call MPI_WAITALL(4, (/ W_send_req, E_send_req, W_recv_req, E_recv_req /), MPI_STATUSES_IGNORE, ierr)
         !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
@@ -210,6 +211,7 @@ PROGRAM main
                                                             + temperatures_last(i,COLUMNS_PER_MPI_PROCESS+1))
         END DO
         
+        ! Fill in corners
         temperatures(1,1) = (temperatures_last(1,0) + temperatures_last(1,2) &
                            + temperatures_last(2,1)) * one_third
         
