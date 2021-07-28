@@ -32,9 +32,9 @@ PROGRAM main
     !> Rank of my bottom neighbour if any
     INTEGER :: S_rank
     !> Array that will contain my part chunk. It will include the 2 ghost rows (1 left, 1 right)
-    REAL(8), DIMENSION(0:ROWS_PER_MPI_PROCESS-1,0:COLUMNS_PER_MPI_PROCESS+1) :: temperatures
+    REAL(8), DIMENSION(1:ROWS_PER_MPI_PROCESS,0:COLUMNS_PER_MPI_PROCESS+1) :: temperatures
     !> Temperatures from the previous iteration, same dimensions as the array above.
-    REAL(8), DIMENSION(0:ROWS_PER_MPI_PROCESS-1,0:COLUMNS_PER_MPI_PROCESS+1) :: temperatures_last
+    REAL(8), DIMENSION(1:ROWS_PER_MPI_PROCESS,0:COLUMNS_PER_MPI_PROCESS+1) :: temperatures_last
     !> On master process only: contains all temperatures read from input file.
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: all_temperatures
     !> Will contain the entire time elapsed in the timed portion of the code
@@ -123,14 +123,14 @@ PROGRAM main
     start_time = MPI_Wtime()
 
     CALL MPI_scatter(all_temperatures, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
-                     temperatures_last(0, 1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
+                     temperatures_last(1,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
                      cart_comm, ierr)
     
     ! Copy the temperatures into the current iteration temperature as well
     !$acc data create(temperatures) copyin(temperatures_last)
     !$acc kernels
     DO j = 1, COLUMNS_PER_MPI_PROCESS
-        DO i = 0, ROWS_PER_MPI_PROCESS - 1
+        DO i = 1, ROWS_PER_MPI_PROCESS
             temperatures(i,j) = temperatures_last(i,j)
         ENDDO
     ENDDO
@@ -152,7 +152,7 @@ PROGRAM main
                              MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
    
             ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
-            call MPI_igather(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
+            call MPI_igather(temperatures(1,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
                     snapshot, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, &
                     MASTER_PROCESS_RANK, cart_comm, gather_req, ierr)
 
@@ -179,7 +179,7 @@ PROGRAM main
         !$acc kernels async(2)
         DO j = 2, COLUMNS_PER_MPI_PROCESS - 1
             ! Process all cells between the first and last columns excluded, which each has both left and right neighbours
-            DO i = 1, ROWS_PER_MPI_PROCESS - 2
+            DO i = 2, ROWS_PER_MPI_PROCESS - 1
                     temperatures(i,j) = 0.25 * (temperatures_last(i-1,j  ) + &
                                                 temperatures_last(i+1,j  ) + &
                                                 temperatures_last(i  ,j-1) + &
@@ -188,20 +188,20 @@ PROGRAM main
         END DO
         DO j = 2, COLUMNS_PER_MPI_PROCESS - 1
             ! Process the cell at the first row, which has no up neighbour
-            temperatures(0,j) = (temperatures_last(0,j-1) + &
-                                 temperatures_last(0,j+1) + &
-                                 temperatures_last(1,j  )) * one_third
+            temperatures(1,j) = (temperatures_last(1,j-1) + &
+                                 temperatures_last(1,j+1) + &
+                                 temperatures_last(2,j  )) * one_third
             ! Process the cell at the bottom row, which has no down neighbour
-            temperatures(ROWS_PER_MPI_PROCESS-1,j) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, j - 1) + &
-                                 temperatures_last(ROWS_PER_MPI_PROCESS-1, j + 1) + &
-                                 temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) * one_third
+            temperatures(ROWS_PER_MPI_PROCESS,j) = (temperatures_last(ROWS_PER_MPI_PROCESS, j - 1) + &
+                                                    temperatures_last(ROWS_PER_MPI_PROCESS, j + 1) + &
+                                                    temperatures_last(ROWS_PER_MPI_PROCESS  -1, j)) * one_third
         ENDDO
         !$acc end kernels 
 
         call MPI_WAITALL(4, (/ W_send_req, E_send_req, W_recv_req, E_recv_req /), MPI_STATUSES_IGNORE, ierr)
         !$acc update device(temperatures_last(:,0), temperatures_last(:,COLUMNS_PER_MPI_PROCESS+1))
         !$acc kernels async(3)
-        DO i = 1, ROWS_PER_MPI_PROCESS - 2
+        DO i = 2, ROWS_PER_MPI_PROCESS - 1
             temperatures(i,1) = 0.25 * (temperatures_last(i-1,1) + temperatures_last(i+1,1) &
                                       + temperatures_last(i,1-1) + temperatures_last(i,1+1))
             temperatures(i,COLUMNS_PER_MPI_PROCESS) = 0.25 * (temperatures_last(i-1,COLUMNS_PER_MPI_PROCESS) &
@@ -210,25 +210,28 @@ PROGRAM main
                                                             + temperatures_last(i,COLUMNS_PER_MPI_PROCESS+1))
         END DO
         
-        temperatures(0,1) = (temperatures_last(0,1-1) + temperatures_last(0,1+1) &
-                           + temperatures_last(1,1)) * one_third 
-        temperatures(ROWS_PER_MPI_PROCESS-1,1) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, 1 - 1) &
-                                                + temperatures_last(ROWS_PER_MPI_PROCESS-1, 1 + 1) &
-                                                + temperatures_last(ROWS_PER_MPI_PROCESS-2, 1)) * one_third
-        temperatures(0,COLUMNS_PER_MPI_PROCESS) = (temperatures_last(0,COLUMNS_PER_MPI_PROCESS-1) &
-                                                 + temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1) &
-                                                 + temperatures_last(1,COLUMNS_PER_MPI_PROCESS)) * one_third 
-        temperatures(ROWS_PER_MPI_PROCESS-1,COLUMNS_PER_MPI_PROCESS) = &
-                 (temperatures_last(ROWS_PER_MPI_PROCESS-1, COLUMNS_PER_MPI_PROCESS - 1) &
-                + temperatures_last(ROWS_PER_MPI_PROCESS-1, COLUMNS_PER_MPI_PROCESS + 1) &
-                + temperatures_last(ROWS_PER_MPI_PROCESS-2, COLUMNS_PER_MPI_PROCESS)) * one_third
+        temperatures(1,1) = (temperatures_last(1,0) + temperatures_last(1,2) &
+                           + temperatures_last(2,1)) * one_third
+        
+        temperatures(ROWS_PER_MPI_PROCESS,1) = (temperatures_last(ROWS_PER_MPI_PROCESS, 1 - 1) &
+                                              + temperatures_last(ROWS_PER_MPI_PROCESS, 1 + 1) &
+                                              + temperatures_last(ROWS_PER_MPI_PROCESS-1, 1)) * one_third
+
+        temperatures(1,COLUMNS_PER_MPI_PROCESS) = (temperatures_last(1,COLUMNS_PER_MPI_PROCESS-1) &
+                                                 + temperatures_last(1,COLUMNS_PER_MPI_PROCESS+1) &
+                                                 + temperatures_last(2,COLUMNS_PER_MPI_PROCESS)) * one_third 
+
+        temperatures(ROWS_PER_MPI_PROCESS,COLUMNS_PER_MPI_PROCESS) = &
+                 (temperatures_last(ROWS_PER_MPI_PROCESS, COLUMNS_PER_MPI_PROCESS - 1) &
+                + temperatures_last(ROWS_PER_MPI_PROCESS, COLUMNS_PER_MPI_PROCESS + 1) &
+                + temperatures_last(ROWS_PER_MPI_PROCESS-1, COLUMNS_PER_MPI_PROCESS)) * one_third
         
         !$acc end kernels 
         
         !$acc kernels wait(2, 3)
         temperatures = merge(temperatures, temperatures_last, temperatures_last /= MAX_TEMPERATURE)
         DO j = 1, COLUMNS_PER_MPI_PROCESS
-            DO i = 0, ROWS_PER_MPI_PROCESS - 1
+            DO i = 1, ROWS_PER_MPI_PROCESS
                 my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)
                 temperatures_last(i,j) = temperatures(i,j)
             END DO
