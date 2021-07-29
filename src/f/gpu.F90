@@ -65,6 +65,7 @@ PROGRAM main
     integer, parameter :: XDIM = 0
     integer :: ndev, idev
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
+    integer :: reduce_req, gather_req, bcast_req
 
     CALL MPI_Init(ierr)
     ! /////////////////////////////////////////////////////
@@ -189,34 +190,8 @@ PROGRAM main
         ! //////////////////////////////////////////////////////////
         ! // -- SUBTASK 4: FIND MAX TEMPERATURE CHANGE OVERALL -- //
         ! //////////////////////////////////////////////////////////
-        IF (my_rank .NE. MASTER_PROCESS_RANK) THEN
-            ! Send my temperature delta to the master MPI process
-            CALL MPI_Ssend(my_temperature_change, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, 0, MPI_COMM_WORLD, ierr)
-            
-            ! Receive the total delta calculated by the MPI process based on all MPI processes delta
-            CALL MPI_Recv(global_temperature_change, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, MPI_ANY_TAG, MPI_COMM_WORLD, &
-                          MPI_STATUS_IGNORE, ierr)
-        ELSE
-            ! Initialise the temperature change to mine
-            global_temperature_change = my_temperature_change
-
-            ! Pick highest temperature change observed
-            DO j = 0, comm_size-1
-                IF (j .NE. my_rank) THEN
-                    CALL MPI_Recv(subtotal, 1, MPI_DOUBLE_PRECISION, j, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    IF (subtotal .GT. global_temperature_change) THEN
-                        global_temperature_change = subtotal
-                    END IF
-                END IF
-            END DO
-
-            ! Send delta back to all MPI processes
-            DO j = 0, comm_size-1
-                IF (j .NE. my_rank) THEN
-                    CALL MPI_Ssend(global_temperature_change, 1, MPI_DOUBLE_PRECISION, j, 0, MPI_COMM_WORLD, ierr)
-                END IF
-            END DO
-        END IF
+        CALL MPI_IBcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, cart_comm, bcast_req, ierr)
+        CALL MPI_WAIT(bcast_req, MPI_STATUS_IGNORE, ierr)
 
         ! //////////////////////////////////////////////////
         ! // -- SUBTASK 5: UPDATE LAST ITERATION ARRAY -- //
