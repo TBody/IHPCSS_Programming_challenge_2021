@@ -143,8 +143,6 @@ PROGRAM main
             call MPI_ireduce(max_temp_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
                              MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
             
-            !!$acc update host(temperatures(0:ROWS_MPI, 1:COLS_MPI+1))
-            temp_buffer = temperatures(0:ROWS_MPI, 1:COLS_MPI+1)
             ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
             call MPI_igather(temp_buffer, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
                     snapshot, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
@@ -169,9 +167,6 @@ PROGRAM main
         
         call MPI_WAITALL(4, (/ W_send_req, E_send_req, W_recv_req, E_recv_req /), MPI_STATUSES_IGNORE, ierr)
 
-        ! /////////////////////////////////////////////
-        ! // -- SUBTASK 2: PROPAGATE TEMPERATURES -- //
-        ! /////////////////////////////////////////////
         DO j = 1, COLUMNS_PER_MPI_PROCESS 
             ! Process the cell at the first row, which has no up neighbour
             IF (temperatures(0,j) .NE. MAX_TEMPERATURE) THEN
@@ -196,28 +191,26 @@ PROGRAM main
             END IF
         END DO
 
-        ! ///////////////////////////////////////////////////////
-        ! // -- SUBTASK 3: CALCULATE MAX TEMPERATURE CHANGE -- //
-        ! ///////////////////////////////////////////////////////
-        my_temperature_change = 0.0
-        DO j = 1, COLUMNS_PER_MPI_PROCESS
-            DO i = 0, ROWS_PER_MPI_PROCESS - 1
-                 my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)
+        IF (MOD(iteration_count+1, SNAPSHOT_INTERVAL) .EQ. 0) THEN
+            my_temperature_change = 0.0
+            DO j = 1, COLUMNS_PER_MPI_PROCESS
+                DO i = 0, ROWS_PER_MPI_PROCESS - 1
+                    my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)
+                END DO
             END DO
-        END DO
+            DO j = 1, COLS_MPI + 1
+                DO i = 0, ROWS_MPI
+                    temp_buffer(i, j) = temperatures(0:ROWS_MPI, 1:COLS_MPI+1)
+                ENDDO
+            ENDDO
+        ENDIF
 
-        ! //////////////////////////////////////////////////
-        ! // -- SUBTASK 5: UPDATE LAST ITERATION ARRAY -- //
-        ! //////////////////////////////////////////////////
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
                 temperatures_last(i,j) = temperatures(i,j)
             END DO
         END DO
 
-        ! ///////////////////////////////////
-        ! // -- SUBTASK 6: GET SNAPSHOT -- //
-        ! ///////////////////////////////////
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             CALL MPI_WAITALL(3, (/ reduce_req, bcast_req, gather_req  /), MPI_STATUSES_IGNORE, ierr)
             if (my_rank == MASTER_PROCESS_RANK) then
