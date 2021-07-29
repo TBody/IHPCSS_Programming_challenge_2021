@@ -203,9 +203,8 @@ PROGRAM main
         END DO
         !$acc end kernels
 
-        !LEFT EDGE
-        call MPI_WAIT(W_recv_req, MPI_STATUS_IGNORE, ierr)
-        !$acc update device(temperatures_last(:,0))
+        call MPI_WAITALL(2, (/W_recv_req, E_recv_req/), MPI_STATUSES_IGNORE, ierr)
+        !$acc update device(temperatures_last(:,0),temperatures_last(:,COLS_MPI+1))
         !$acc kernels
         ! Process the cell at the first row, which has no up neighbour
         IF (temperatures(0,1) .NE. MAX_TEMPERATURE) THEN
@@ -228,12 +227,6 @@ PROGRAM main
                                                         temperatures_last(ROWS_PER_MPI_PROCESS-1, 1 + 1) + &
                                                         temperatures_last(ROWS_PER_MPI_PROCESS-2, 1)) / 3.0
         END IF
-        !$acc end kernels
-
-        !RIGHT EDGE
-        call MPI_WAIT(E_recv_req, MPI_STATUS_IGNORE, ierr)
-        !$acc update device(temperatures_last(:,COLS_MPI+1))
-        !$acc kernels
         ! Process the cell at the first row, which has no up neighbour
         IF (temperatures(0,COLS_MPI) .NE. MAX_TEMPERATURE) THEN
             temperatures(0,COLS_MPI) = (temperatures_last(0,COLS_MPI-1) + &
