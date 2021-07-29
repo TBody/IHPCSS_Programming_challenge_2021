@@ -207,29 +207,19 @@ PROGRAM main
         ! // -- SUBTASK 6: GET SNAPSHOT -- //
         ! ///////////////////////////////////
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
-            IF (my_rank == MASTER_PROCESS_RANK) THEN
-                DO j = 0, comm_size-1
-                    IF (j .EQ. my_rank) THEN
-                        ! Copy locally my own temperature array in the global one
-                        DO k = 0, ROWS_PER_MPI_PROCESS-1
-                            DO l = 0, COLUMNS_PER_MPI_PROCESS-1
-                                snapshot(j * ROWS_PER_MPI_PROCESS + k,l) = temperatures(k + 1,l)
-                            END DO
-                        END DO
-                    ELSE
-                        CALL MPI_Recv(snapshot(0, j * COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, &
-                                      MPI_DOUBLE_PRECISION, j, MPI_ANY_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-                    END IF
-                END DO
 
+            call MPI_igather(temperatures(0,1), ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
+                    snapshot, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
+                    MASTER_PROCESS_RANK, cart_comm, gather_req, ierr)
+
+            IF (my_rank == MASTER_PROCESS_RANK) THEN
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
+                
                 if (print_snap_sum) then
-                WRITE(*,'(A,I0,A,5E18.10)') 'Iter-snap-sum ', iteration_count, ': ', sum(snapshot) 
+                    call MPI_WAIT(gather_req, MPI_STATUS_IGNORE, ierr)
+                    WRITE(*,'(A,I0,A,5E18.10)') 'Iter-snap-sum ', iteration_count, ': ', sum(snapshot) 
                 endif
-            ELSE
-                ! Send my array to the master MPI process
-                CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
-                               0, MPI_COMM_WORLD, ierr) 
+                
             END IF
         END IF
 
