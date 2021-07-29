@@ -130,15 +130,15 @@ PROGRAM main
                      cart_comm, ierr)
     
     ! Copy the temperatures into the current iteration temperature as well
-    !$acc data create(temperatures) copyin(temperatures_last)
-    !$acc kernels
+    !!$acc data create(temperatures) copyin(temperatures_last)
+    !!$acc kernels
     DO j = 1, COLS_MPI
         DO i = 1, ROWS_MPI
             temperatures(i,j) = temperatures_last(i,j)
         ENDDO
     ENDDO
-    !$acc end kernels
-    !$acc update host(temperatures(:,1), temperatures(:,COLS_MPI)) async(1)
+    !!$acc end kernels
+    !!$acc update host(temperatures(:,1), temperatures(:,COLS_MPI)) async(1)
 
     DO WHILE (total_time_so_far .LT. MAX_TIME)
 
@@ -156,7 +156,7 @@ PROGRAM main
             call MPI_ireduce(dtemp_buffer, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
                              MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
             
-            !$acc update host(temperatures)
+            !!$acc update host(temperatures)
             ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
             call MPI_igather(temperatures(1,1), ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
                     snapshot, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
@@ -164,7 +164,7 @@ PROGRAM main
 
         END IF
         
-        !$acc wait(1)
+        !!$acc wait(1)
         CALL MPI_Isend(temperatures(:,1), ROWS_MPI, MPI_DOUBLE_PRECISION, W_rank, &
                        101, cart_comm, W_send_req, ierr)
         CALL MPI_IRecv(temperatures_last(:,COLS_MPI+1), ROWS_MPI, MPI_DOUBLE_PRECISION, E_rank, &
@@ -175,7 +175,7 @@ PROGRAM main
                        102, cart_comm, W_recv_req, ierr)
 
         my_temperature_change = 0.0
-        !$acc kernels async(2)
+        !!$acc kernels async(2)
         DO j = 2, COLS_MPI - 1
             ! Process all cells between the first and last columns excluded, which each has both left and right neighbours
             DO i = 2, ROWS_MPI - 1
@@ -195,11 +195,11 @@ PROGRAM main
                                                     temperatures_last(ROWS_MPI, j + 1) + &
                                                     temperatures_last(ROWS_MPI  -1, j)) * one_third
         ENDDO
-        !$acc end kernels
+        !!$acc end kernels
 
         call MPI_WAITALL(4, (/ W_send_req, E_send_req, W_recv_req, E_recv_req /), MPI_STATUSES_IGNORE, ierr)
-        !$acc update device(temperatures_last(:,0), temperatures_last(:,COLS_MPI+1))
-        !$acc kernels async(3)
+        !!$acc update device(temperatures_last(:,0), temperatures_last(:,COLS_MPI+1))
+        !!$acc kernels async(3)
         DO i = 2, ROWS_MPI - 1
             temperatures(i,1) = 0.25 * (temperatures_last(i-1,1) + temperatures_last(i+1,1) &
                                       + temperatures_last(i,1-1) + temperatures_last(i,1+1))
@@ -225,9 +225,9 @@ PROGRAM main
                  (temperatures_last(ROWS_MPI, COLS_MPI - 1) &
                 + temperatures_last(ROWS_MPI, COLS_MPI + 1) &
                 + temperatures_last(ROWS_MPI-1, COLS_MPI)) * one_third
-        !$acc end kernels 
+        !!$acc end kernels 
         
-        !$acc kernels wait(2, 3)
+        !!$acc kernels wait(2, 3)
         temperatures = merge(temperatures, temperatures_last, temperatures_last /= MAX_TEMPERATURE)
         DO j = 1, COLS_MPI
             DO i = 1, ROWS_MPI
@@ -235,8 +235,8 @@ PROGRAM main
                 temperatures_last(i,j) = temperatures(i,j)
             END DO
         END DO
-        !$acc end kernels
-        !$acc update host(temperatures(:,1), temperatures(:,COLS_MPI)) async(1)
+        !!$acc end kernels
+        !!$acc update host(temperatures(:,1), temperatures(:,COLS_MPI)) async(1)
 
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             CALL MPI_WAITALL(3, (/ reduce_req, bcast_req, gather_req  /), MPI_STATUSES_IGNORE, ierr)
@@ -255,7 +255,7 @@ PROGRAM main
         ! of iteration_count was set to -1)
         iteration_count = iteration_count + 1
     END DO
-    !$acc end data
+    !!$acc end data
 
     ! ///////////////////////////////////////////////
     ! //     ^                                     //
