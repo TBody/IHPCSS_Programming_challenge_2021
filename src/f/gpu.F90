@@ -47,7 +47,7 @@ PROGRAM main
     !> Iterator
     INTEGER :: l
     !> Keep track of the current iteration count
-    INTEGER :: iteration_count = 0
+    INTEGER :: iteration_count = -1
     !> Maximum temperature change observed across all MPI processes
     REAL(8) :: global_temperature_change
     !> Maximum temperature change for us
@@ -130,14 +130,27 @@ PROGRAM main
         ENDDO
     ENDDO
 
-    ! /////////////////////////////
-    ! // TASK 2: DATA PROCESSING //
-    ! /////////////////////////////
-
     DO WHILE (total_time_so_far .LT. MAX_TIME)
-        ! ////////////////////////////////////////
-        ! -- SUBTASK 1: EXCHANGE GHOST CELLS -- //
-        ! ////////////////////////////////////////
+        
+        IF (my_rank == MASTER_PROCESS_RANK) THEN
+            total_time_so_far = MPI_Wtime() - start_time
+        END IF
+
+        CALL MPI_IBcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, cart_comm, bcast_req, ierr)
+
+        IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
+            max_temp_change = my_temperature_change
+            call MPI_ireduce(max_temp_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+                             MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
+            
+            !!$acc update host(temperatures(1:ROWS_MPI, 1:COLS_MPI))
+            temp_buffer = temperatures(0:ROWS_MPI, 1:COLS_MPI+1)
+            ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
+            call MPI_igather(temp_buffer, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
+                    snapshot, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
+                    MASTER_PROCESS_RANK, cart_comm, gather_req, ierr)
+
+        END IF
 
         ! Send data to up neighbour for its ghost cells. If my W_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
         CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, W_rank, 0, MPI_COMM_WORLD, ierr)
@@ -191,14 +204,6 @@ PROGRAM main
             END DO
         END DO
 
-        ! //////////////////////////////////////////////////////////
-        ! // -- SUBTASK 4: FIND MAX TEMPERATURE CHANGE OVERALL -- //
-        ! //////////////////////////////////////////////////////////
-        max_temp_change = my_temperature_change
-        call MPI_ireduce(max_temp_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-                             MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
-        CALL MPI_WAIT(reduce_req, MPI_STATUS_IGNORE, ierr)
-
         ! //////////////////////////////////////////////////
         ! // -- SUBTASK 5: UPDATE LAST ITERATION ARRAY -- //
         ! //////////////////////////////////////////////////
@@ -212,33 +217,16 @@ PROGRAM main
         ! // -- SUBTASK 6: GET SNAPSHOT -- //
         ! ///////////////////////////////////
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
-            
-            temp_buffer = temperatures(0:ROWS_MPI, 1:COLS_MPI+1)
-
-            call MPI_igather(temp_buffer, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
-                    snapshot, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
-                    MASTER_PROCESS_RANK, cart_comm, gather_req, ierr)
-
-            call MPI_WAIT(gather_req, MPI_STATUS_IGNORE, ierr)
-            
-            IF (my_rank == MASTER_PROCESS_RANK) THEN
+            CALL MPI_WAITALL(3, (/ reduce_req, bcast_req, gather_req  /), MPI_STATUSES_IGNORE, ierr)
+            if (my_rank == MASTER_PROCESS_RANK) then
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
-                
-                if (print_snap_sum) then
-                    WRITE(*,'(A,I0,A,5E18.10)') 'Iter-snap-sum ', iteration_count, ': ', sum(snapshot) 
+                if (check_snapshot) then
+                    WRITE(*,'(A,I10,A,5E14.7)') 'Iteration ', iteration_count, ': sum snapshot: ', sum(snapshot)
                 endif
-
-            END IF
+            endif
+        else
+            CALL MPI_WAIT(bcast_req, MPI_STATUS_IGNORE, ierr)
         END IF
-
-        ! Calculate the total time spent processing
-        IF (my_rank == MASTER_PROCESS_RANK) THEN
-            total_time_so_far = MPI_Wtime() - start_time
-        END IF
-
-        ! Send total timer to everybody so they too can exit the loop if more than the allowed runtime has elapsed already
-        CALL MPI_IBcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, cart_comm, bcast_req, ierr)
-        CALL MPI_WAIT(bcast_req, MPI_STATUS_IGNORE, ierr)
 
         ! Update the iteration number
         iteration_count = iteration_count + 1
