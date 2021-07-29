@@ -71,6 +71,7 @@ PROGRAM main
     REAL(8) :: max_temp_change
 
     real(8), dimension(0:ROWS_PER_MPI_PROCESS-1) :: w_send_buf, e_send_buf
+    integer, parameter :: update_host = 1
 
     CALL MPI_Init(ierr)
     ! /////////////////////////////////////////////////////
@@ -132,7 +133,7 @@ PROGRAM main
         ENDDO
     ENDDO
     !$acc end kernels
-    !$acc update host(temperatures(:,1), temperatures(:,COLS_MPI))
+    !$acc update host(temperatures(:,1), temperatures(:,COLS_MPI)) async(update_host)
 
     DO WHILE (total_time_so_far .LT. MAX_TIME)
         
@@ -154,6 +155,7 @@ PROGRAM main
 
         END IF
 
+        !$acc wait(update_host)
         w_send_buf = temperatures(:,1)
         e_send_buf = temperatures(:,COLS_MPI)
 
@@ -269,7 +271,7 @@ PROGRAM main
             !$acc end kernels
         ENDIF
         
-        !$acc update host(temperatures(:,1), temperatures(:,COLS_MPI))
+        !$acc update host(temperatures(:,1), temperatures(:,COLS_MPI)) async(update_host)
         
         !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS
