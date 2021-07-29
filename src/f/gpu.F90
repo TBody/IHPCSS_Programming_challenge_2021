@@ -57,7 +57,7 @@ PROGRAM main
     !> The last snapshot made
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
     integer :: cart_comm
-    logical, parameter :: print_snap_sum = .false.
+    logical, parameter :: print_snap_sum = .true.
 
     integer, parameter :: NX = COLS/COLS_MPI
     integer, parameter :: NY = ROWS/ROWS_MPI
@@ -66,6 +66,7 @@ PROGRAM main
     integer :: ndev, idev
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
     integer :: reduce_req, gather_req, bcast_req
+    real(8) :: sum_snap
 
     CALL MPI_Init(ierr)
     ! /////////////////////////////////////////////////////
@@ -224,7 +225,13 @@ PROGRAM main
 
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
                 if (print_snap_sum) then
-                WRITE(*,'(A,I0,A,5E18.10)') 'Iter-snap-sum ', iteration_count, ': ', sum(snapshot) 
+                  sum_snap = 0.0
+                  do i = 0, COLUMNS - 1
+                    do j = 0, ROWS - 1
+                      sum_snap = sum_snap + snapshot(i, j)
+                    enddo
+                  enddo
+                  WRITE(*,'(A,I0,A,5E18.10)') 'Iter-snap-sum ', iteration_count, ': ', sum_snap
                 endif
             ELSE
                 ! Send my array to the master MPI process
