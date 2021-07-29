@@ -67,6 +67,7 @@ PROGRAM main
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
     integer :: reduce_req, gather_req, bcast_req
     real(8) :: sum_snap
+    real(8), dimension(0:ROWS_MPI, 1:COLS_MPI+1) :: temp_buffer
 
     CALL MPI_Init(ierr)
     ! /////////////////////////////////////////////////////
@@ -208,6 +209,9 @@ PROGRAM main
         ! // -- SUBTASK 6: GET SNAPSHOT -- //
         ! ///////////////////////////////////
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
+
+            temp_buffer = temperatures(0:ROWS_MPI, 1:COLS_MPI+1)
+
             IF (my_rank == MASTER_PROCESS_RANK) THEN
                 DO j = 0, comm_size-1
                     IF (j .EQ. my_rank) THEN
@@ -235,7 +239,7 @@ PROGRAM main
                 endif
             ELSE
                 ! Send my array to the master MPI process
-                CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
+                CALL MPI_Ssend(temp_buffer, ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
                                0, MPI_COMM_WORLD, ierr) 
             END IF
         END IF
