@@ -1,0 +1,18 @@
+ Data acquisition complete.
+Iteration 0: 12.500000000000000000
+Iter-snap-sum 0:   0.2950272100E+10
+Iteration 25: 0.462081517722978674
+Iter-snap-sum 25:   0.2953603091E+10
+Iteration 50: 0.237572979390019867
+Iter-snap-sum 50:   0.2955355816E+10
+Iteration 75: 0.159232105679329550
+Iter-snap-sum 75:   0.2956714495E+10
+Iteration 100: 0.119853118823609606
+Iter-snap-sum 100:   0.2957864721E+10
+Iteration 125: 0.096079500037223653
+Iter-snap-sum 125:   0.2958880450E+10
+Iteration 150: 0.080071814820882992
+Iter-snap-sum 150:   0.2959800112E+10
+Iteration 175: 0.068654064312315910
+Iter-snap-sum 175:   0.2960646716E+10
+The program took 30.08 seconds in total and executed 179 iterations.

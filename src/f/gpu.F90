@@ -251,6 +251,7 @@ PROGRAM main
                 END DO
 
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
+                WRITE(*,'(A,I0,A,5E18.10)') 'Iter-snap-sum ', iteration_count, ': ', sum(snapshot) 
             ELSE
                 ! Send my array to the master MPI process
                 CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
