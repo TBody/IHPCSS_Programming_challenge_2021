@@ -124,12 +124,15 @@ PROGRAM main
                      temperatures_last(0,1), ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
                      cart_comm, ierr)
 
-    ! Copy the temperatures into the current iteration temperature as well
+    !$acc data create(temperatures) copyin(temperatures_last)
+    !$acc kernels
     DO j = 1, COLUMNS_PER_MPI_PROCESS
         DO i = 0, ROWS_PER_MPI_PROCESS - 1
             temperatures(i,j) = temperatures_last(i,j)
         ENDDO
     ENDDO
+    !$acc end kernels
+    !$acc update host(temperatures(:,1), temperatures(:,COLS_MPI))
 
     DO WHILE (total_time_so_far .LT. MAX_TIME)
         
@@ -170,6 +173,7 @@ PROGRAM main
                       W_recv_req, ierr)
 
         !CENTRE BLOCK
+        !$acc kernels
         DO j = 2, COLUMNS_PER_MPI_PROCESS -1
             ! Process the cell at the first row, which has no up neighbour
             IF (temperatures(0,j) .NE. MAX_TEMPERATURE) THEN
@@ -193,9 +197,12 @@ PROGRAM main
                                                           temperatures_last(ROWS_PER_MPI_PROCESS-2, j)) / 3.0
             END IF
         END DO
+        !$acc end kernels
 
         !LEFT EDGE
         call MPI_WAIT(W_recv_req, MPI_STATUS_IGNORE, ierr)
+        !$acc update device(temperatures_last(:,0))
+        !$acc kernels
         ! Process the cell at the first row, which has no up neighbour
         IF (temperatures(0,1) .NE. MAX_TEMPERATURE) THEN
             temperatures(0,1) = (temperatures_last(0,1-1) + &
@@ -217,9 +224,12 @@ PROGRAM main
                                                         temperatures_last(ROWS_PER_MPI_PROCESS-1, 1 + 1) + &
                                                         temperatures_last(ROWS_PER_MPI_PROCESS-2, 1)) / 3.0
         END IF
+        !$acc end kernels
 
         !RIGHT EDGE
         call MPI_WAIT(E_recv_req, MPI_STATUS_IGNORE, ierr)
+        !$acc update device(temperatures_last(:,COLS_MPI+1))
+        !$acc kernels
         ! Process the cell at the first row, which has no up neighbour
         IF (temperatures(0,COLS_MPI) .NE. MAX_TEMPERATURE) THEN
             temperatures(0,COLS_MPI) = (temperatures_last(0,COLS_MPI-1) + &
@@ -241,9 +251,11 @@ PROGRAM main
                                                         temperatures_last(ROWS_PER_MPI_PROCESS-1, COLS_MPI + 1) + &
                                                         temperatures_last(ROWS_PER_MPI_PROCESS-2, COLS_MPI)) / 3.0
         END IF
+        !$acc end kernels
 
         IF (MOD(iteration_count+1, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             my_temperature_change = 0.0
+            !$acc kernels copy(my_temperature_change) copyout(temp_buffer)
             DO j = 1, COLUMNS_PER_MPI_PROCESS
                 DO i = 0, ROWS_PER_MPI_PROCESS - 1
                     my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)
@@ -254,13 +266,16 @@ PROGRAM main
                     temp_buffer(i, j) = temperatures(i, j)
                 ENDDO
             ENDDO
+            !$acc end kernels
         ENDIF
 
+        !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
                 temperatures_last(i,j) = temperatures(i,j)
             END DO
         END DO
+        !$acc end kernels
 
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             CALL MPI_WAITALL(5, (/ reduce_req, bcast_req, gather_req, W_send_req, E_send_req /), MPI_STATUSES_IGNORE, ierr)
