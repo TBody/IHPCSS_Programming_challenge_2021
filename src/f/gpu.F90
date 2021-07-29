@@ -168,8 +168,6 @@ PROGRAM main
         ! Receive data from up neighbour to fill our ghost cells. If my W_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
         CALL MPI_IRecv(temperatures_last(0,0), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, W_rank, 102, MPI_COMM_WORLD, &
                       W_recv_req, ierr)
-        
-        call MPI_WAITALL(4, (/ W_send_req, E_send_req, W_recv_req, E_recv_req /), MPI_STATUSES_IGNORE, ierr)
 
         !CENTRE BLOCK
         DO j = 2, COLUMNS_PER_MPI_PROCESS -1
@@ -197,6 +195,7 @@ PROGRAM main
         END DO
 
         !LEFT EDGE
+        call MPI_WAIT(W_recv_req, MPI_STATUS_IGNORE, ierr)
         ! Process the cell at the first row, which has no up neighbour
         IF (temperatures(0,1) .NE. MAX_TEMPERATURE) THEN
             temperatures(0,1) = (temperatures_last(0,1-1) + &
@@ -220,6 +219,7 @@ PROGRAM main
         END IF
 
         !RIGHT EDGE
+        call MPI_WAIT(E_recv_req, MPI_STATUS_IGNORE, ierr)
         ! Process the cell at the first row, which has no up neighbour
         IF (temperatures(0,COLS_MPI) .NE. MAX_TEMPERATURE) THEN
             temperatures(0,COLS_MPI) = (temperatures_last(0,COLS_MPI-1) + &
@@ -242,9 +242,6 @@ PROGRAM main
                                                         temperatures_last(ROWS_PER_MPI_PROCESS-2, COLS_MPI)) / 3.0
         END IF
 
-
-
-
         IF (MOD(iteration_count+1, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             my_temperature_change = 0.0
             DO j = 1, COLUMNS_PER_MPI_PROCESS
@@ -266,7 +263,7 @@ PROGRAM main
         END DO
 
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
-            CALL MPI_WAITALL(3, (/ reduce_req, bcast_req, gather_req  /), MPI_STATUSES_IGNORE, ierr)
+            CALL MPI_WAITALL(5, (/ reduce_req, bcast_req, gather_req, W_send_req, E_send_req /), MPI_STATUSES_IGNORE, ierr)
             if (my_rank == MASTER_PROCESS_RANK) then
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
                 if (print_snap_sum) then
@@ -274,7 +271,7 @@ PROGRAM main
                 endif
             endif
         else
-            CALL MPI_WAIT(bcast_req, MPI_STATUS_IGNORE, ierr)
+            CALL MPI_WAITALL(3, (/ bcast_req, W_send_req, E_send_req /), MPI_STATUSES_IGNORE, ierr)
         END IF
 
         ! Update the iteration number
