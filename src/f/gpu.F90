@@ -153,9 +153,9 @@ PROGRAM main
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             dtemp_buffer = my_temperature_change
 
-            call MPI_ireduce(dtemp_buffer, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
-                             MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
-            
+            call MPI_reduce(dtemp_buffer, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+                             MASTER_PROCESS_RANK, cart_comm, ierr)
+            reduce_req = MPI_SUCCESS 
             !!$acc update host(temperatures)
             ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
             call MPI_igather(temperatures(1,1), ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
