@@ -76,6 +76,7 @@ PROGRAM main
     integer, parameter :: NY = ROWS/ROWS_MPI
     integer, dimension(0:1) :: dims, coords
     logical, parameter :: check_snapshot = .false.
+    real(8) :: dtemp_buffer
     CALL MPI_Init(ierr)
     
     ! /////////////////////////////////////////////////////
@@ -150,10 +151,12 @@ PROGRAM main
         CALL MPI_IBcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, cart_comm, bcast_req, ierr)
 
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
-            call MPI_ireduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+            dtemp_buffer = my_temperature_change
+
+            call MPI_ireduce(dtemp_buffer, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
                              MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
             
-            !$acc wait(1,4)
+            !$acc update host(temperatures)
             ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
             call MPI_igather(temperatures(1,1), ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
                     snapshot, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
@@ -192,13 +195,7 @@ PROGRAM main
                                                     temperatures_last(ROWS_MPI, j + 1) + &
                                                     temperatures_last(ROWS_MPI  -1, j)) * one_third
         ENDDO
-        temperatures(:,2:COLS_MPI-1) = merge(temperatures(:,2:COLS_MPI-1), temperatures_last(:,2:COLS_MPI-1), &
-            temperatures_last(:,2:COLS_MPI-1) /= MAX_TEMPERATURE)
         !$acc end kernels
-        IF (MOD(iteration_count+1, SNAPSHOT_INTERVAL) .EQ. 0) THEN
-            !$acc update host(temperatures(:,2:COLS_MPI-1)) async(4)
-            continue
-        ENDIF
 
         call MPI_WAITALL(4, (/ W_send_req, E_send_req, W_recv_req, E_recv_req /), MPI_STATUSES_IGNORE, ierr)
         !$acc update device(temperatures_last(:,0), temperatures_last(:,COLS_MPI+1))
@@ -228,12 +225,10 @@ PROGRAM main
                  (temperatures_last(ROWS_MPI, COLS_MPI - 1) &
                 + temperatures_last(ROWS_MPI, COLS_MPI + 1) &
                 + temperatures_last(ROWS_MPI-1, COLS_MPI)) * one_third
-        
-        temperatures(:,1) = merge(temperatures(:,1), temperatures_last(:,1), temperatures_last(:,1) /= MAX_TEMPERATURE)
-        temperatures(:,COLS_MPI) = merge(temperatures(:,COLS_MPI), temperatures_last(:,COLS_MPI), temperatures_last(:,COLS_MPI) /= MAX_TEMPERATURE)
         !$acc end kernels 
         
         !$acc kernels wait(2, 3)
+        temperatures = merge(temperatures, temperatures_last, temperatures_last /= MAX_TEMPERATURE)
         DO j = 1, COLS_MPI
             DO i = 1, ROWS_MPI
                 my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)
