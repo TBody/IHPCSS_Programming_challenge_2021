@@ -75,6 +75,7 @@ PROGRAM main
     integer, parameter :: copyout_snapshot = 2
     integer, parameter :: centre_block = 3
     integer, parameter :: edges_block = 4
+    integer, parameter :: temp_reset = 5
 
     CALL MPI_Init(ierr)
     ! /////////////////////////////////////////////////////
@@ -159,7 +160,7 @@ PROGRAM main
 
         END IF
 
-        !$acc wait(update_host)
+        !$acc wait(update_host, temp_reset)
         w_send_buf = temperatures(:,1)
         e_send_buf = temperatures(:,COLS_MPI)
 
@@ -272,7 +273,7 @@ PROGRAM main
         
         !$acc update host(temperatures(:,1), temperatures(:,COLS_MPI)) async(update_host)
         
-        !$acc kernels
+        !$acc kernels async(temp_reset)
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
                 temperatures_last(i,j) = temperatures(i,j)
