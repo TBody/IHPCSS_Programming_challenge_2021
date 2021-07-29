@@ -9,6 +9,7 @@ PROGRAM main
     USE mpi
 
     IMPLICIT NONE
+    integer, parameter :: COLS = COLUMNS, ROWS_MPI = ROWS_PER_MPI_PROCESS, COLS_MPI = COLUMNS_PER_MPI_PROCESS
    
     !> Used to get the error code returned by MPI routines
     INTEGER :: ierr
@@ -54,9 +55,10 @@ PROGRAM main
     REAL(8) :: subtotal
     !> The last snapshot made
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
-  
+    integer :: cart_comm
+    logical, parameter :: print_snap_sum = .false.
     CALL MPI_Init(ierr)
-
+    cart_comm = MPI_COMM_WORLD
     ! /////////////////////////////////////////////////////
     ! ! -- PREPARATION 1: COLLECT USEFUL INFORMATION -- //
     ! /////////////////////////////////////////////////////
@@ -104,13 +106,6 @@ PROGRAM main
         ENDDO
     ENDDO
 
-    IF (my_rank == MASTER_PROCESS_RANK) THEN
-        WRITE(*,*) 'Data acquisition complete.'
-    END IF
-
-    ! Wait for everybody to receive their part before we can start processing
-    CALL MPI_Barrier(MPI_COMM_WORLD, ierr)
-    
     ! /////////////////////////////
     ! // TASK 2: DATA PROCESSING //
     ! /////////////////////////////
@@ -233,7 +228,9 @@ PROGRAM main
                 END DO
 
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
+                if (print_snap_sum) then
                 WRITE(*,'(A,I0,A,5E18.10)') 'Iter-snap-sum ', iteration_count, ': ', sum(snapshot) 
+                endif
             ELSE
                 ! Send my array to the master MPI process
                 CALL MPI_Ssend(temperatures(0,1), ROWS_PER_MPI_PROCESS * COLUMNS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, &
