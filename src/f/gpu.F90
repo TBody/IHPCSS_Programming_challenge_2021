@@ -67,7 +67,7 @@ PROGRAM main
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
     integer :: reduce_req, gather_req, bcast_req
 
-    REAL(8), DIMENSION(0:ROWS_MPI-1,0:COLS_MPI-1) :: temp_buffer
+    real(8), dimension(0:ROWS_MPI, 1:COLS_MPI+1) :: temp_buffer
     REAL(8) :: max_temp_change
 
 
@@ -143,7 +143,7 @@ PROGRAM main
             call MPI_ireduce(max_temp_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
                              MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
             
-            !!$acc update host(temperatures(1:ROWS_MPI, 1:COLS_MPI))
+            !!$acc update host(temperatures(0:ROWS_MPI, 1:COLS_MPI+1))
             temp_buffer = temperatures(0:ROWS_MPI, 1:COLS_MPI+1)
             ! Verified that the sum of the gather is equal to the sum of the individual sends and recieves 
             call MPI_igather(temp_buffer, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
@@ -220,7 +220,7 @@ PROGRAM main
             CALL MPI_WAITALL(3, (/ reduce_req, bcast_req, gather_req  /), MPI_STATUSES_IGNORE, ierr)
             if (my_rank == MASTER_PROCESS_RANK) then
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
-                if (check_snapshot) then
+                if (print_snap_sum) then
                     WRITE(*,'(A,I10,A,5E14.7)') 'Iteration ', iteration_count, ': sum snapshot: ', sum(snapshot)
                 endif
             endif
