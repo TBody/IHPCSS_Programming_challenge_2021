@@ -5,3 +5,4 @@ report_*.txt
 error.txt
 *.o
 *.mod
+**/*.DS_Store
