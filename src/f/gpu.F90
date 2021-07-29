@@ -70,6 +70,7 @@ PROGRAM main
     real(8), dimension(0:ROWS_MPI, 1:COLS_MPI+1) :: temp_buffer
     REAL(8) :: max_temp_change
 
+    real(8), dimension(0:ROWS_PER_MPI_PROCESS-1) :: w_send_buf, e_send_buf
 
     CALL MPI_Init(ierr)
     ! /////////////////////////////////////////////////////
@@ -150,15 +151,18 @@ PROGRAM main
 
         END IF
 
+        w_send_buf = temperatures(:,1)
+        e_send_buf = temperatures(:,COLS_MPI)
+
         ! Send data to up neighbour for its ghost cells. If my W_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        CALL MPI_Isend(temperatures(0,1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, W_rank, 101, MPI_COMM_WORLD, W_send_req, ierr)
+        CALL MPI_Isend(w_send_buf, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, W_rank, 101, MPI_COMM_WORLD, W_send_req, ierr)
 
         ! Receive data from down neighbour to fill our ghost cells. If my E_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
         CALL MPI_IRecv(temperatures_last(0,COLUMNS_PER_MPI_PROCESS+1), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, E_rank, &
                       101, MPI_COMM_WORLD, E_recv_req, ierr)
 
         ! Send data to down neighbour for its ghost cells. If my E_rank is MPI_PROC_NULL, this MPI_Ssend will do nothing.
-        CALL MPI_Isend(temperatures(0, COLUMNS_PER_MPI_PROCESS), ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, E_rank, 102,&
+        CALL MPI_Isend(e_send_buf, ROWS_PER_MPI_PROCESS, MPI_DOUBLE_PRECISION, E_rank, 102,&
                        MPI_COMM_WORLD, E_send_req, ierr)
 
         ! Receive data from up neighbour to fill our ghost cells. If my W_rank is MPI_PROC_NULL, this MPI_Recv will do nothing.
