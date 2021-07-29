@@ -190,8 +190,9 @@ PROGRAM main
         ! //////////////////////////////////////////////////////////
         ! // -- SUBTASK 4: FIND MAX TEMPERATURE CHANGE OVERALL -- //
         ! //////////////////////////////////////////////////////////
-        CALL MPI_IBcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, cart_comm, bcast_req, ierr)
-        CALL MPI_WAIT(bcast_req, MPI_STATUS_IGNORE, ierr)
+        call MPI_ireduce(my_temperature_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
+                             MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
+        CALL MPI_WAIT(reduce_req, MPI_STATUS_IGNORE, ierr)
 
         ! //////////////////////////////////////////////////
         ! // -- SUBTASK 5: UPDATE LAST ITERATION ARRAY -- //
