@@ -167,7 +167,8 @@ PROGRAM main
         
         call MPI_WAITALL(4, (/ W_send_req, E_send_req, W_recv_req, E_recv_req /), MPI_STATUSES_IGNORE, ierr)
 
-        DO j = 1, COLUMNS_PER_MPI_PROCESS 
+        !CENTRE BLOCK
+        DO j = 2, COLUMNS_PER_MPI_PROCESS -1
             ! Process the cell at the first row, which has no up neighbour
             IF (temperatures(0,j) .NE. MAX_TEMPERATURE) THEN
                 temperatures(0,j) = (temperatures_last(0,j-1) + &
@@ -191,6 +192,55 @@ PROGRAM main
             END IF
         END DO
 
+        !LEFT EDGE
+        ! Process the cell at the first row, which has no up neighbour
+        IF (temperatures(0,1) .NE. MAX_TEMPERATURE) THEN
+            temperatures(0,1) = (temperatures_last(0,1-1) + &
+                                    temperatures_last(0,1+1) + &
+                                    temperatures_last(1,1  )) / 3.0
+        END IF
+        ! Process all cells between the first and last columns excluded, which each has both left and right neighbours
+        DO i = 1, ROWS_PER_MPI_PROCESS - 2
+            IF (temperatures(i,1) .NE. MAX_TEMPERATURE) THEN
+                temperatures(i,1) = 0.25 * (temperatures_last(i-1,1  ) + &
+                                            temperatures_last(i+1,1  ) + &
+                                            temperatures_last(i  ,1-1) + &
+                                            temperatures_last(i  ,1+1))
+            END IF
+        END DO
+        ! Process the cell at the bottom row, which has no down neighbour
+        IF (temperatures(ROWS_PER_MPI_PROCESS-1,1) .NE. MAX_TEMPERATURE) THEN
+            temperatures(ROWS_PER_MPI_PROCESS-1,1) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, 1 - 1) + &
+                                                        temperatures_last(ROWS_PER_MPI_PROCESS-1, 1 + 1) + &
+                                                        temperatures_last(ROWS_PER_MPI_PROCESS-2, 1)) / 3.0
+        END IF
+
+        !RIGHT EDGE
+        ! Process the cell at the first row, which has no up neighbour
+        IF (temperatures(0,COLS_MPI) .NE. MAX_TEMPERATURE) THEN
+            temperatures(0,COLS_MPI) = (temperatures_last(0,COLS_MPI-1) + &
+                                    temperatures_last(0,COLS_MPI+1) + &
+                                    temperatures_last(1,COLS_MPI  )) / 3.0
+        END IF
+        ! Process all cells between the first and last columns excluded, which each has both left and right neighbours
+        DO i = 1, ROWS_PER_MPI_PROCESS - 2
+            IF (temperatures(i,COLS_MPI) .NE. MAX_TEMPERATURE) THEN
+                temperatures(i,COLS_MPI) = 0.25 * (temperatures_last(i-1,COLS_MPI  ) + &
+                                            temperatures_last(i+1,COLS_MPI  ) + &
+                                            temperatures_last(i  ,COLS_MPI-1) + &
+                                            temperatures_last(i  ,COLS_MPI+1))
+            END IF
+        END DO
+        ! Process the cell at the bottom row, which has no down neighbour
+        IF (temperatures(ROWS_PER_MPI_PROCESS-1,COLS_MPI) .NE. MAX_TEMPERATURE) THEN
+            temperatures(ROWS_PER_MPI_PROCESS-1,COLS_MPI) = (temperatures_last(ROWS_PER_MPI_PROCESS-1, COLS_MPI - 1) + &
+                                                        temperatures_last(ROWS_PER_MPI_PROCESS-1, COLS_MPI + 1) + &
+                                                        temperatures_last(ROWS_PER_MPI_PROCESS-2, COLS_MPI)) / 3.0
+        END IF
+
+
+
+
         IF (MOD(iteration_count+1, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             my_temperature_change = 0.0
             DO j = 1, COLUMNS_PER_MPI_PROCESS
@@ -200,7 +250,7 @@ PROGRAM main
             END DO
             DO j = 1, COLS_MPI + 1
                 DO i = 0, ROWS_MPI
-                    temp_buffer(i, j) = temperatures(0:ROWS_MPI, 1:COLS_MPI+1)
+                    temp_buffer(i, j) = temperatures(i, j)
                 ENDDO
             ENDDO
         ENDIF
