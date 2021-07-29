@@ -219,7 +219,7 @@ PROGRAM main
                     call MPI_WAIT(gather_req, MPI_STATUS_IGNORE, ierr)
                     WRITE(*,'(A,I0,A,5E18.10)') 'Iter-snap-sum ', iteration_count, ': ', sum(snapshot) 
                 endif
-                
+
             END IF
         END IF
 
@@ -229,7 +229,8 @@ PROGRAM main
         END IF
 
         ! Send total timer to everybody so they too can exit the loop if more than the allowed runtime has elapsed already
-        CALL MPI_Bcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, MPI_COMM_WORLD, ierr)
+        CALL MPI_IBcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, cart_comm, bcast_req, ierr)
+        CALL MPI_WAIT(bcast_req, MPI_STATUS_IGNORE, ierr)
 
         ! Update the iteration number
         iteration_count = iteration_count + 1
