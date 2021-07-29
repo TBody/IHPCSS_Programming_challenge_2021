@@ -73,6 +73,8 @@ PROGRAM main
     real(8), dimension(0:ROWS_PER_MPI_PROCESS-1) :: w_send_buf, e_send_buf
     integer, parameter :: update_host = 1
     integer, parameter :: copyout_snapshot = 2
+    integer, parameter :: centre_block = 3
+    integer, parameter :: edges_block = 4
 
     CALL MPI_Init(ierr)
     ! /////////////////////////////////////////////////////
@@ -177,7 +179,7 @@ PROGRAM main
                       W_recv_req, ierr)
 
         !CENTRE BLOCK
-        !$acc kernels
+        !$acc kernels async(centre_block)
         DO j = 2, COLUMNS_PER_MPI_PROCESS -1
             ! Process the cell at the first row, which has no up neighbour
             IF (temperatures(0,j) .NE. MAX_TEMPERATURE) THEN
@@ -205,7 +207,7 @@ PROGRAM main
 
         call MPI_WAITALL(2, (/W_recv_req, E_recv_req/), MPI_STATUSES_IGNORE, ierr)
         !$acc update device(temperatures_last(:,0),temperatures_last(:,COLS_MPI+1))
-        !$acc kernels
+        !$acc kernels async(edges_block)
         ! Process the cell at the first row, which has no up neighbour
         IF (temperatures(0,1) .NE. MAX_TEMPERATURE) THEN
             temperatures(0,1) = (temperatures_last(0,1-1) + &
@@ -249,6 +251,8 @@ PROGRAM main
                                                         temperatures_last(ROWS_PER_MPI_PROCESS-2, COLS_MPI)) / 3.0
         END IF
         !$acc end kernels
+
+        !$acc wait(centre_block, edges_blocks)
 
         IF (MOD(iteration_count+1, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             my_temperature_change = 0.0
