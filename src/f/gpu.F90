@@ -7,6 +7,7 @@
 PROGRAM main
     USE util
     USE mpi
+    USE openacc
 
     IMPLICIT NONE
     integer, parameter :: COLS = COLUMNS, ROWS_MPI = ROWS_PER_MPI_PROCESS, COLS_MPI = COLUMNS_PER_MPI_PROCESS
@@ -61,7 +62,7 @@ PROGRAM main
     integer, parameter :: NX = COLS/COLS_MPI
     integer, parameter :: NY = ROWS/ROWS_MPI
     integer, dimension(0:1) :: dims, coords
-
+    integer, parameter :: XDIM = 0
     integer :: ndev, idev
     real(8), parameter :: one_third = 1.0_8 / 3.0_8
 
