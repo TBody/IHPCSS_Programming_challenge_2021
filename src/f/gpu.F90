@@ -57,7 +57,7 @@ PROGRAM main
     !> The last snapshot made
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
     integer :: cart_comm
-    logical, parameter :: print_snap_sum = .false.
+    logical, parameter :: print_snap_sum = .true.
 
     integer, parameter :: NX = COLS/COLS_MPI
     integer, parameter :: NY = ROWS/ROWS_MPI
@@ -212,11 +212,12 @@ PROGRAM main
                     snapshot, ROWS_MPI * COLS_MPI, MPI_DOUBLE_PRECISION, &
                     MASTER_PROCESS_RANK, cart_comm, gather_req, ierr)
 
+            call MPI_WAIT(gather_req, MPI_STATUS_IGNORE, ierr)
+            
             IF (my_rank == MASTER_PROCESS_RANK) THEN
                 WRITE(*,'(A,I0,A,F0.18)') 'Iteration ', iteration_count, ': ', global_temperature_change
                 
                 if (print_snap_sum) then
-                    call MPI_WAIT(gather_req, MPI_STATUS_IGNORE, ierr)
                     WRITE(*,'(A,I0,A,5E18.10)') 'Iter-snap-sum ', iteration_count, ': ', sum(snapshot) 
                 endif
                 
