@@ -252,7 +252,7 @@ PROGRAM main
         END IF
         !$acc end kernels
 
-        !$acc wait(centre_block, edges_blocks)
+        !$acc wait(centre_block, edges_block)
 
         IF (MOD(iteration_count+1, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             my_temperature_change = 0.0
