@@ -72,6 +72,7 @@ PROGRAM main
 
     real(8), dimension(0:ROWS_PER_MPI_PROCESS-1) :: w_send_buf, e_send_buf
     integer, parameter :: update_host = 1
+    integer, parameter :: copyout_snapshot = 2
 
     CALL MPI_Init(ierr)
     ! /////////////////////////////////////////////////////
@@ -144,6 +145,7 @@ PROGRAM main
         CALL MPI_IBcast(total_time_so_far, 1, MPI_DOUBLE_PRECISION, MASTER_PROCESS_RANK, cart_comm, bcast_req, ierr)
 
         IF (MOD(iteration_count, SNAPSHOT_INTERVAL) .EQ. 0) THEN
+            !$acc wait(copyout_snapshot)
             max_temp_change = my_temperature_change
             call MPI_ireduce(max_temp_change, global_temperature_change, 1, MPI_DOUBLE_PRECISION, MPI_MAX, &
                              MASTER_PROCESS_RANK, cart_comm, reduce_req, ierr)
@@ -257,7 +259,7 @@ PROGRAM main
 
         IF (MOD(iteration_count+1, SNAPSHOT_INTERVAL) .EQ. 0) THEN
             my_temperature_change = 0.0
-            !$acc kernels copy(my_temperature_change) copyout(temp_buffer)
+            !$acc kernels copy(my_temperature_change) copyout(temp_buffer) async(copyout_snapshot)
             DO j = 1, COLUMNS_PER_MPI_PROCESS
                 DO i = 0, ROWS_PER_MPI_PROCESS - 1
                     my_temperature_change = max(abs(temperatures(i,j) - temperatures_last(i,j)), my_temperature_change)
