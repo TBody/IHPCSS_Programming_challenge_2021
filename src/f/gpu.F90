@@ -57,7 +57,7 @@ PROGRAM main
     !> The last snapshot made
     REAL(8), DIMENSION(0:ROWS-1,0:COLUMNS-1) :: snapshot
     integer :: cart_comm
-    logical, parameter :: print_snap_sum = .true.
+    logical, parameter :: print_snap_sum = .false.
 
     integer, parameter :: NX = COLS/COLS_MPI
     integer, parameter :: NY = ROWS/ROWS_MPI
@@ -268,7 +268,9 @@ PROGRAM main
             ENDDO
             !$acc end kernels
         ENDIF
-
+        
+        !$acc update host(temperatures(:,1), temperatures(:,COLS_MPI))
+        
         !$acc kernels
         DO j = 1, COLUMNS_PER_MPI_PROCESS
             DO i = 0, ROWS_PER_MPI_PROCESS - 1
@@ -292,6 +294,7 @@ PROGRAM main
         ! Update the iteration number
         iteration_count = iteration_count + 1
     END DO
+    !$acc end data
 
     ! ///////////////////////////////////////////////
     ! //     ^                                     //
